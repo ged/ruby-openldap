@@ -11,7 +11,7 @@ BEGIN {
 require 'rspec'
 require 'openldap'
 
-describe Openldap do
+describe OpenLDAP do
 
 	it "is well-tested" do
 		fail "it isn't"

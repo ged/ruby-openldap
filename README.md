@@ -1,10 +1,11 @@
 # openldap
 
-* FIX (url)
+* http://bitbucket.org/ged/ruby-openldap
+
 
 ## Description
 
-FIX (describe your package)
+A binding to the OpenLDAP client library (libldap).
 
 
 ## Installation
