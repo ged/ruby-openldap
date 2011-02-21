@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
+#include <assert.h>
 
 #include <ldap.h>
 
@@ -19,8 +20,11 @@
  * -------------------------------------------------------------- */
 
 extern VALUE ropenldap_mOpenLDAP;
+extern VALUE ropenldap_mOpenLDAPLoggable;
 
 extern VALUE ropenldap_cOpenLDAPConnection;
+
+extern VALUE ropenldap_eOpenLDAPError;
 
 
 /* --------------------------------------------------------------
@@ -44,12 +48,28 @@ struct ropenldap_connection {
  * Declarations
  * -------------------------------------------------------------- */
 
+#ifdef HAVE_STDARG_PROTOTYPES
+#include <stdarg.h>
+#define va_init_list(a,b) va_start(a,b)
+void ropenldap_log_obj( VALUE, const char *, const char *, ... );
+void ropenldap_log( const char *, const char *, ... );
+#else
+#include <varargs.h>
+#define va_init_list(a,b) va_start(a)
+void ropenldap_log_obj( VALUE, const char *, const char *, va_dcl );
+void ropenldap_log( const char *, const char *, va_dcl );
+#endif
+
+void ropenldap_check_result				_(( LDAP *, int, const char * ));
+void ropenldap_check_opt_result			_(( LDAP *, int, const char * ));
+
 
 /* --------------------------------------------------------------
  * Initializers
  * -------------------------------------------------------------- */
 
-void Init_openldap_ext( void );
+void Init_openldap_ext					_(( void ));
+void ropenldap_init_connection			_(( void ));
 
 
 #endif /* __OPENLDAP_H__ */

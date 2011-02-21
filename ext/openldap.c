@@ -42,10 +42,329 @@
 #include "openldap.h"
 
 VALUE ropenldap_mOpenLDAP;
+VALUE ropenldap_mOpenLDAPLoggable;
+
+VALUE ropenldap_eOpenLDAPError;
+
+
+/* --------------------------------------------------------------
+ * Logging Functions
+ * -------------------------------------------------------------- */
+
+/*
+ * Log a message to the given +context+ object's logger.
+ */
+void
+#ifdef HAVE_STDARG_PROTOTYPES
+ropenldap_log_obj( VALUE context, const char *level, const char *fmt, ... )
+#else
+ropenldap_log_obj( VALUE context, const char *level, const char *fmt, va_dcl )
+#endif
+{
+	char buf[BUFSIZ];
+	va_list	args;
+	VALUE logger = Qnil;
+	VALUE message = Qnil;
+
+	va_start( args, fmt );
+	vsnprintf( buf, BUFSIZ, fmt, args );
+	message = rb_str_new2( buf );
+
+	logger = rb_funcall( context, rb_intern("log"), 0, 0 );
+	rb_funcall( logger, rb_intern(level), 1, message );
+
+	va_end( args );
+}
+
+
+/*
+ * Log a message to the global logger.
+ */
+void
+#ifdef HAVE_STDARG_PROTOTYPES
+ropenldap_log( const char *level, const char *fmt, ... )
+#else
+ropenldap_log( const char *level, const char *fmt, va_dcl )
+#endif
+{
+	char buf[BUFSIZ];
+	va_list	args;
+	VALUE logger = Qnil;
+	VALUE message = Qnil;
+
+	va_init_list( args, fmt );
+	vsnprintf( buf, BUFSIZ, fmt, args );
+	message = rb_str_new2( buf );
+
+	logger = rb_funcall( ropenldap_mOpenLDAP, rb_intern("logger"), 0, 0 );
+	rb_funcall( logger, rb_intern(level), 1, message );
+
+	va_end( args );
+}
+
+
+/*
+ * Raise an appropriate exception with an appropriate message for the given
+ * resultcode.
+ */
+void
+ropenldap_check_result( LDAP *ldp, int resultcode, const char *func )
+{
+	VALUE exception_class = Qnil;
+
+	if ( resultcode == LDAP_SUCCESS ) return;
+
+	exception_class =
+		rb_funcall( ropenldap_eOpenLDAPError, rb_intern("subclass_for"), 1, INT2FIX(resultcode) );
+
+	rb_raise( exception_class, func );
+}
+
+
+/*
+ * Raise an appropriate exception for the given option +resultcode+ if one is
+ * warranted.
+ */
+void
+ropenldap_check_opt_result( LDAP *ldp, int optresult, const char *opt )
+{
+	if ( optresult == LDAP_OPT_SUCCESS ) return;
+	rb_raise( rb_eRuntimeError, "Failed to set option %s: %d", opt, optresult );
+}
+
+
+/*
+ * Convert an array of string pointers to a Ruby Array of Strings.
+ */
+static VALUE
+ropenldap_rb_string_array( char **strings )
+{
+	VALUE ary = rb_ary_new();
+	char **iter;
+
+	/* If there aren't any pointers, just return the empty Array */
+	if ( !strings ) return ary;
+
+	for ( iter = strings ; *iter != NULL ; iter++ ) {
+		ropenldap_log( "debug", "  adding %s to string array", *iter );
+		rb_ary_push( ary, rb_str_new2(*iter) );
+	}
+
+	return ary;
+}
+
+
+
+/*
+ * call-seq:
+ *    OpenLDAP.split_url( str )   -> array
+ *
+ * Split an LDAP URL into an array of its parts:
+ * - uri_scheme
+ * - host
+ * - port
+ * - base
+ * - attrs
+ * - scope
+ * - filter
+ * - exts
+ * - crit_exts
+ */
+static VALUE
+ropenldap_s_split_url( VALUE _, VALUE urlstring )
+{
+	const char *url = StringValueCStr( urlstring );
+	LDAPURLDesc *urldesc;
+	VALUE rval = Qnil, obj = Qnil;
+
+	if ( !ldap_is_ldap_url(url) )
+		rb_raise( rb_eArgError, "Not an LDAP URL." );
+
+	/* Parse the URL */
+	if ( ldap_url_parse(url, &urldesc) != 0 )
+		rb_raise( rb_eRuntimeError, "Error parsing %s as an LDAP URL!", url );
+
+	rval = rb_ary_new2( 9 );
+
+	/* Scheme */
+	if ( urldesc->lud_scheme ) {
+		ropenldap_log( "debug", "  parsed scheme: %s", urldesc->lud_scheme );
+		obj = rb_str_new2( urldesc->lud_scheme );
+		OBJ_INFECT( obj, urlstring );
+		rb_ary_store( rval, 0L, obj );
+	}
+
+	/* LDAP host to contact */
+	if ( urldesc->lud_host ) {
+		ropenldap_log( "debug", "  parsed host: %s", urldesc->lud_host );
+		obj = rb_str_new2( urldesc->lud_host );
+		OBJ_INFECT( obj, urlstring );
+		rb_ary_store( rval, 1L, obj );
+	}
+
+	/* Port */
+	rb_ary_store( rval, 2L, INT2FIX(urldesc->lud_port) );
+
+	/* Base DN */
+	if ( urldesc->lud_dn ) {
+		ropenldap_log( "debug", "  parsed DN: %s", urldesc->lud_dn );
+		obj = rb_str_new2( urldesc->lud_dn );
+		OBJ_INFECT( obj, urlstring );
+		rb_ary_store( rval, 3L, obj );
+	}
+
+	/* Attributes */
+	rb_ary_store( rval, 4L, ropenldap_rb_string_array(urldesc->lud_attrs) );
+
+	/* Numeric scope (LDAP_SCOPE_*) */
+	rb_ary_store( rval, 5L, INT2FIX(urldesc->lud_scope) );
+
+	/* Filter */
+	if ( urldesc->lud_filter ) {
+		ropenldap_log( "debug", "  parsed filter: %s", urldesc->lud_filter );
+		obj = rb_str_new2( urldesc->lud_filter );
+		OBJ_INFECT( obj, urlstring );
+		rb_ary_store( rval, 6L, obj );
+	}
+
+	/* lists of LDAP extensions */
+	rb_ary_store( rval, 7L, ropenldap_rb_string_array(urldesc->lud_exts) );
+
+	/* Critical extension/s flag */
+	rb_ary_store( rval, 8L, urldesc->lud_crit_exts ? Qtrue : Qfalse );
+
+	ldap_free_urldesc( urldesc );
+
+	return rval;
+}
+
+
+/*
+ * call-seq:
+ *    OpenLDAP.err2string( resultcode )   -> string
+ *
+ * Return a short description of the +resultcode+ returned by routines in this library.
+ *
+ */
+static VALUE
+ropenldap_s_err2string( VALUE _, VALUE resultcode )
+{
+	int err = FIX2INT( resultcode );
+	char *string = ldap_err2string( err );
+
+	return rb_str_new2( string );
+}
+
+
 
 void
 Init_openldap_ext( void )
 {
+	rb_require( "openldap" );
 	ropenldap_mOpenLDAP = rb_define_module( "OpenLDAP" );
+	ropenldap_mOpenLDAPLoggable = rb_define_module_under( ropenldap_mOpenLDAP, "Loggable" );
+
+	ropenldap_eOpenLDAPError = rb_define_class_under( ropenldap_mOpenLDAP, "Error", rb_eRuntimeError );
+
+	/* Constants */
+
+	/* versions */
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_API_VERSION", INT2FIX(LDAP_API_VERSION) );
+
+	/* search scopes */
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SCOPE_BASE", INT2FIX(LDAP_SCOPE_BASE) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SCOPE_BASEOBJECT", INT2FIX(LDAP_SCOPE_BASEOBJECT) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SCOPE_ONELEVEL", INT2FIX(LDAP_SCOPE_ONELEVEL) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SCOPE_ONE", INT2FIX(LDAP_SCOPE_ONE) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SCOPE_SUBTREE", INT2FIX(LDAP_SCOPE_SUBTREE) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SCOPE_SUB", INT2FIX(LDAP_SCOPE_SUB) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SCOPE_SUBORDINATE", INT2FIX(LDAP_SCOPE_SUBORDINATE) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SCOPE_CHILDREN", INT2FIX(LDAP_SCOPE_CHILDREN) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SCOPE_DEFAULT", INT2FIX(LDAP_SCOPE_DEFAULT) );
+
+	/* result codes */
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SUCCESS", INT2FIX(LDAP_SUCCESS) );
+
+ 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_OPERATIONS_ERROR", INT2FIX(LDAP_OPERATIONS_ERROR) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_PROTOCOL_ERROR", INT2FIX(LDAP_PROTOCOL_ERROR) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_TIMELIMIT_EXCEEDED", INT2FIX(LDAP_TIMELIMIT_EXCEEDED) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SIZELIMIT_EXCEEDED", INT2FIX(LDAP_SIZELIMIT_EXCEEDED) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_COMPARE_FALSE", INT2FIX(LDAP_COMPARE_FALSE) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_COMPARE_TRUE", INT2FIX(LDAP_COMPARE_TRUE) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_AUTH_METHOD_NOT_SUPPORTED", INT2FIX(LDAP_AUTH_METHOD_NOT_SUPPORTED) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_STRONG_AUTH_NOT_SUPPORTED", INT2FIX(LDAP_STRONG_AUTH_NOT_SUPPORTED) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_STRONG_AUTH_REQUIRED", INT2FIX(LDAP_STRONG_AUTH_REQUIRED) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_STRONGER_AUTH_REQUIRED", INT2FIX(LDAP_STRONGER_AUTH_REQUIRED) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_PARTIAL_RESULTS", INT2FIX(LDAP_PARTIAL_RESULTS) );
+
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_REFERRAL", INT2FIX(LDAP_REFERRAL) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_ADMINLIMIT_EXCEEDED", INT2FIX(LDAP_ADMINLIMIT_EXCEEDED) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_UNAVAILABLE_CRITICAL_EXTENSION", INT2FIX(LDAP_UNAVAILABLE_CRITICAL_EXTENSION) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_CONFIDENTIALITY_REQUIRED", INT2FIX(LDAP_CONFIDENTIALITY_REQUIRED) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SASL_BIND_IN_PROGRESS", INT2FIX(LDAP_SASL_BIND_IN_PROGRESS) );
+
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_NO_SUCH_ATTRIBUTE", INT2FIX(LDAP_NO_SUCH_ATTRIBUTE) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_UNDEFINED_TYPE", INT2FIX(LDAP_UNDEFINED_TYPE) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_INAPPROPRIATE_MATCHING", INT2FIX(LDAP_INAPPROPRIATE_MATCHING) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_CONSTRAINT_VIOLATION", INT2FIX(LDAP_CONSTRAINT_VIOLATION) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_TYPE_OR_VALUE_EXISTS", INT2FIX(LDAP_TYPE_OR_VALUE_EXISTS) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_INVALID_SYNTAX", INT2FIX(LDAP_INVALID_SYNTAX) );
+
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_NO_SUCH_OBJECT", INT2FIX(LDAP_NO_SUCH_OBJECT) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_ALIAS_PROBLEM", INT2FIX(LDAP_ALIAS_PROBLEM) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_INVALID_DN_SYNTAX", INT2FIX(LDAP_INVALID_DN_SYNTAX) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_IS_LEAF", INT2FIX(LDAP_IS_LEAF) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_ALIAS_DEREF_PROBLEM", INT2FIX(LDAP_ALIAS_DEREF_PROBLEM) );
+
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_X_PROXY_AUTHZ_FAILURE", INT2FIX(LDAP_X_PROXY_AUTHZ_FAILURE) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_INAPPROPRIATE_AUTH", INT2FIX(LDAP_INAPPROPRIATE_AUTH) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_INVALID_CREDENTIALS", INT2FIX(LDAP_INVALID_CREDENTIALS) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_INSUFFICIENT_ACCESS", INT2FIX(LDAP_INSUFFICIENT_ACCESS) );
+
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_BUSY", INT2FIX(LDAP_BUSY) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_UNAVAILABLE", INT2FIX(LDAP_UNAVAILABLE) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_UNWILLING_TO_PERFORM", INT2FIX(LDAP_UNWILLING_TO_PERFORM) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_LOOP_DETECT", INT2FIX(LDAP_LOOP_DETECT) );
+
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_NAMING_VIOLATION", INT2FIX(LDAP_NAMING_VIOLATION) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_OBJECT_CLASS_VIOLATION", INT2FIX(LDAP_OBJECT_CLASS_VIOLATION) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_NOT_ALLOWED_ON_NONLEAF", INT2FIX(LDAP_NOT_ALLOWED_ON_NONLEAF) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_NOT_ALLOWED_ON_RDN", INT2FIX(LDAP_NOT_ALLOWED_ON_RDN) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_ALREADY_EXISTS", INT2FIX(LDAP_ALREADY_EXISTS) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_NO_OBJECT_CLASS_MODS", INT2FIX(LDAP_NO_OBJECT_CLASS_MODS) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_RESULTS_TOO_LARGE", INT2FIX(LDAP_RESULTS_TOO_LARGE) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_AFFECTS_MULTIPLE_DSAS", INT2FIX(LDAP_AFFECTS_MULTIPLE_DSAS) );
+
+#ifdef LDAP_VLV_ERROR
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_VLV_ERROR", INT2FIX(LDAP_VLV_ERROR) );
+#endif
+
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_OTHER", INT2FIX(LDAP_OTHER) );
+
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SERVER_DOWN", INT2FIX(LDAP_SERVER_DOWN) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_LOCAL_ERROR", INT2FIX(LDAP_LOCAL_ERROR) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_ENCODING_ERROR", INT2FIX(LDAP_ENCODING_ERROR) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_DECODING_ERROR", INT2FIX(LDAP_DECODING_ERROR) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_TIMEOUT", INT2FIX(LDAP_TIMEOUT) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_AUTH_UNKNOWN", INT2FIX(LDAP_AUTH_UNKNOWN) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_FILTER_ERROR", INT2FIX(LDAP_FILTER_ERROR) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_USER_CANCELLED", INT2FIX(LDAP_USER_CANCELLED) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_PARAM_ERROR", INT2FIX(LDAP_PARAM_ERROR) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_NO_MEMORY", INT2FIX(LDAP_NO_MEMORY) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_CONNECT_ERROR", INT2FIX(LDAP_CONNECT_ERROR) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_NOT_SUPPORTED", INT2FIX(LDAP_NOT_SUPPORTED) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_CONTROL_NOT_FOUND", INT2FIX(LDAP_CONTROL_NOT_FOUND) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_NO_RESULTS_RETURNED", INT2FIX(LDAP_NO_RESULTS_RETURNED) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_MORE_RESULTS_TO_RETURN", INT2FIX(LDAP_MORE_RESULTS_TO_RETURN) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_CLIENT_LOOP", INT2FIX(LDAP_CLIENT_LOOP) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_REFERRAL_LIMIT_EXCEEDED", INT2FIX(LDAP_REFERRAL_LIMIT_EXCEEDED) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_X_CONNECTING", INT2FIX(LDAP_X_CONNECTING) );
+
+	/* Module functions */
+	rb_define_singleton_method( ropenldap_mOpenLDAP, "split_url", ropenldap_s_split_url, 1 );
+	rb_define_singleton_method( ropenldap_mOpenLDAP, "err2string", ropenldap_s_err2string, 1 );
+
+	/* Initialize the other parts of the extension */
+	ropenldap_init_connection();
 }
 

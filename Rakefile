@@ -1,5 +1,6 @@
 #!/usr/bin/env rake
 
+require 'pp'
 require 'rbconfig'
 require 'pathname'
 
@@ -23,6 +24,21 @@ EXTDIR  = BASEDIR + 'ext'
 
 DLEXT   = Config::CONFIG['DLEXT']
 EXT     = LIBDIR + "bluecloth_ext.#{DLEXT}"
+
+VALGRIND_OPTIONS = [
+	"--num-callers=50",
+	"--error-limit=no",
+	"--partial-loads-ok=yes",
+	"--undef-value-errors=no",
+]
+VALGRIND_MEMORYFILL_OPTIONS = [
+	"--freelist-vol=100000000",
+	"--malloc-fill=6D",
+	"--free-fill=66 ",
+]
+
+GDB_OPTIONS = []
+
 
 # Load Hoe plugins
 Hoe.plugin :mercurial
@@ -50,8 +66,8 @@ hoespec = Hoe.spec 'openldap' do
 
 	self.require_ruby_version( '>= 1.8.7' )
 
-	self.hg_sign_tags = true if self.plugin?( :mercurial )
-	self.yard_opts = [ '--protected', '--verbose' ] if self.plugin?( :yard )
+	self.hg_sign_tags = true if self.respond_to?( :hg_sign_tags= )
+	self.yard_opts = [ '--protected', '--verbose' ] if self.respond_to?( :yard_opts= )
 
 	self.rdoc_locations << "deveiate:/usr/local/www/public/code/#{remote_rdoc_dir}"
 end
@@ -91,6 +107,28 @@ Rake::ExtensionTask.new do |ext|
 	ext.source_pattern = "*.{c,h}"
 	ext.cross_compile  = true
 	ext.cross_platform = %w[i386-mswin32 i386-mingw32]
+end
+
+
+namespace :spec do
+
+	RSPEC_CMD = [ RUBY, '-S', 'rspec', '-Ilib:ext', SPECDIR.to_s ]
+
+	desc "Run the specs under GDB."
+	task :gdb => [ :compile ] do |task|
+		cmd = [ 'gdb' ] + GDB_OPTIONS
+		cmd += [ '--args' ]
+		cmd += RSPEC_CMD
+		run( *cmd )
+	end
+
+	desc "Run the specs under Valgrind."
+	task :valgrind do
+		cmd = [ 'valgrind' ] + VALGRIND_OPTIONS
+		cmd += RSPEC_CMD
+		run( *cmd )
+	end
+
 end
 
 
