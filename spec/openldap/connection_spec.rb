@@ -16,7 +16,7 @@ require 'openldap/connection'
 describe OpenLDAP::Connection do
 
 	before( :all ) do
-		setup_logging( :debug )
+		setup_logging( :fatal )
 	end
 
 	after( :all ) do
@@ -24,7 +24,7 @@ describe OpenLDAP::Connection do
 	end
 
 
-	TEST_LDAP_URI = 'ldap://localhost/dc=acme,dc=com'
+	TEST_LDAP_URI = 'ldap://localhost/'
 
 	it "can be created with an LDAP uri" do
 		OpenLDAP::Connection.new( TEST_LDAP_URI )

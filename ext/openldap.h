@@ -20,6 +20,7 @@
  * -------------------------------------------------------------- */
 
 extern VALUE ropenldap_mOpenLDAP;
+extern VALUE ropenldap_mOpenLDAPLoggable;
 
 extern VALUE ropenldap_cOpenLDAPConnection;
 
@@ -59,7 +60,8 @@ void ropenldap_log_obj( VALUE, const char *, const char *, va_dcl );
 void ropenldap_log( const char *, const char *, va_dcl );
 #endif
 
-void ropenldap_check_result				_(( LDAP *, int ));
+void ropenldap_check_result				_(( LDAP *, int, const char * ));
+void ropenldap_check_opt_result			_(( LDAP *, int, const char * ));
 
 
 /* --------------------------------------------------------------

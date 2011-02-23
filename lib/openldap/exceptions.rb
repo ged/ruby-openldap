@@ -21,6 +21,13 @@ module OpenLDAP
 			subclass.instance_variable_set( :@result_code, nil )
 		end
 
+		### Return the appropriate Exception class for the given +resultcode+.
+		### @param [Integer] resultcode  the result code from an ldap_* call.
+		### @return [Class] 
+		def self::subclass_for( resultcode )
+			return OpenLDAP::RESULT_EXCEPTION_CLASS[ resultcode ]
+		end
+
 	end # class Error
 
 
@@ -122,10 +129,11 @@ module OpenLDAP
 	def_ldap_exception :ResultsTooLarge, LDAP_RESULTS_TOO_LARGE, OpenLDAP::UpdateError
 	def_ldap_exception :AffectsMultipleDSAs, LDAP_AFFECTS_MULTIPLE_DSAS, OpenLDAP::UpdateError
 
-	def_ldap_exception :VLVError, LDAP_VLV_ERROR
+	def_ldap_exception :VLVError, LDAP_VLV_ERROR if defined?( OpenLDAP::LDAP_VLV_ERROR )
 
 	# Implementation-specific errors
 	class OtherError < OpenLDAP::Error; end
+	RESULT_EXCEPTION_CLASS.default = OpenLDAP::OtherError
 
 	# API Error Codes
 	# 

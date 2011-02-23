@@ -42,6 +42,7 @@
 #include "openldap.h"
 
 VALUE ropenldap_mOpenLDAP;
+VALUE ropenldap_mOpenLDAPLoggable;
 
 VALUE ropenldap_eOpenLDAPError;
 
@@ -102,16 +103,33 @@ ropenldap_log( const char *level, const char *fmt, va_dcl )
 }
 
 
-/* 
+/*
  * Raise an appropriate exception with an appropriate message for the given
  * resultcode.
  */
 void
-ropenldap_check_result( LDAP *ldp, int resultcode )
+ropenldap_check_result( LDAP *ldp, int resultcode, const char *func )
 {
+	VALUE exception_class = Qnil;
+
 	if ( resultcode == LDAP_SUCCESS ) return;
 
-	
+	exception_class =
+		rb_funcall( ropenldap_eOpenLDAPError, rb_intern("subclass_for"), 1, INT2FIX(resultcode) );
+
+	rb_raise( exception_class, func );
+}
+
+
+/*
+ * Raise an appropriate exception for the given option +resultcode+ if one is
+ * warranted.
+ */
+void
+ropenldap_check_opt_result( LDAP *ldp, int optresult, const char *opt )
+{
+	if ( optresult == LDAP_OPT_SUCCESS ) return;
+	rb_raise( rb_eRuntimeError, "Failed to set option %s: %d", opt, optresult );
 }
 
 
@@ -134,6 +152,7 @@ ropenldap_rb_string_array( char **strings )
 
 	return ary;
 }
+
 
 
 /*
@@ -241,7 +260,9 @@ ropenldap_s_err2string( VALUE _, VALUE resultcode )
 void
 Init_openldap_ext( void )
 {
+	rb_require( "openldap" );
 	ropenldap_mOpenLDAP = rb_define_module( "OpenLDAP" );
+	ropenldap_mOpenLDAPLoggable = rb_define_module_under( ropenldap_mOpenLDAP, "Loggable" );
 
 	ropenldap_eOpenLDAPError = rb_define_class_under( ropenldap_mOpenLDAP, "Error", rb_eRuntimeError );
 
@@ -314,7 +335,9 @@ Init_openldap_ext( void )
 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_RESULTS_TOO_LARGE", INT2FIX(LDAP_RESULTS_TOO_LARGE) );
 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_AFFECTS_MULTIPLE_DSAS", INT2FIX(LDAP_AFFECTS_MULTIPLE_DSAS) );
 
+#ifdef LDAP_VLV_ERROR
 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_VLV_ERROR", INT2FIX(LDAP_VLV_ERROR) );
+#endif
 
 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_OTHER", INT2FIX(LDAP_OTHER) );
 
@@ -341,5 +364,7 @@ Init_openldap_ext( void )
 	rb_define_singleton_method( ropenldap_mOpenLDAP, "split_url", ropenldap_s_split_url, 1 );
 	rb_define_singleton_method( ropenldap_mOpenLDAP, "err2string", ropenldap_s_err2string, 1 );
 
+	/* Initialize the other parts of the extension */
+	ropenldap_init_connection();
 }
 
