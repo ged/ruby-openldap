@@ -5,7 +5,7 @@
 
 ## Description
 
-A simple, but feature-complete Ruby binding for OpenLDAP's libldap.
+A simple, but feature-complete Ruby binding for OpenLDAP's libldap. 
 
 This binding is intended as an alternative for [ruby-ldap][] for libraries or applications which require a more complete implementation of the LDAP protocol (according to [RFC4511][]) than it provides.
 
@@ -29,6 +29,10 @@ Additions or changes:
   modern equivalent.
 * M17n for Ruby 1.9.x.
 * Improved test coverage
+
+**NOTE:** This library is still under development, and should not be considered to be feature-complete or production-ready.
+
+This project's versions follow the [Semantic Versioning Specification][semver].
 
 
 ## Installation
@@ -89,6 +93,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 [RFC4511]: http://tools.ietf.org/html/rfc4511
 [ruby-ldap]: http://ruby-ldap.sourceforge.net/
+[semver]: http://semver.org/
 [bitbucket]: https://bitbucket.org/ged/ruby-openldap
 [github]: https://github.com/ged/ruby-openldap
 
