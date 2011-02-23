@@ -5,27 +5,52 @@
 
 ## Description
 
-A binding to the OpenLDAP client library (libldap).
+A simple, but feature-complete Ruby binding for OpenLDAP's libldap.
+
+This binding is intended as an alternative for [ruby-ldap][] for libraries or applications which require a more complete implementation of the LDAP protocol (according to [RFC4511][]) than it provides.
+
+Additions or changes:
+
+* Referrals for add, modify, delete, modrdn, compare
+* Controls for add, modify, delete, modrdn, compare
+* Asynchronous and synchronous APIs
+* Detailed exception class hierarchy for results instead of just one
+  class for all non-success results.
+* Complete [RFC4511][] support:
+  - extended operations and results
+  - unsolicited notifications
+  - continuation references
+  - intermediate responses
+  - etc.
+* Cleanly abandon terminated operations where supported
+* Memory-handling cleanup to avoid leaks, corruption, and other
+  problems experienced in the wild.
+* Drop deprecated non-_ext variants of operations which have a 
+  modern equivalent.
+* M17n for Ruby 1.9.x.
+* Improved test coverage
 
 
 ## Installation
 
     gem install openldap
 
+You may have to specify the path to `libldap` like so:
+
+    gem install openldap -- --with-ldap-dir=/usr/local
+
+and/or override your Ruby implementation's architecture flags if your Ruby and OpenLDAP installations don't match, particularly under MacOS X:
+
+    ARCHFLAGS="-arch x86_64" gem install openldap
+
 
 ## Contributing
 
-You can check out the current development source with Mercurial like so:
-
-    hg clone FIX (hg repo)
-
-Or if you prefer Git, via its Github mirror:
-
-    FIX (github mirror)
+You can check out the current development source with Mercurial via its [Bitbucket project][bitbucket]. Or if you prefer Git, via [its Github mirror][github].
 
 After checking out the source, run:
 
-  $ rake newb
+    $ rake newb
 
 This task will install any missing dependencies, run the tests/specs,
 and generate the API documentation.
@@ -60,3 +85,10 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+[RFC4511]: http://tools.ietf.org/html/rfc4511
+[ruby-ldap]: http://ruby-ldap.sourceforge.net/
+[bitbucket]: https://bitbucket.org/ged/ruby-openldap
+[github]: https://github.com/ged/ruby-openldap
+
