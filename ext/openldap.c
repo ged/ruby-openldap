@@ -1,3 +1,4 @@
+
 /*
  * Ruby-OpenLDAP -- a Ruby binding to OpenLDAP's libldap
  * $Id$
@@ -45,6 +46,8 @@ VALUE ropenldap_mOpenLDAP;
 VALUE ropenldap_mOpenLDAPLoggable;
 
 VALUE ropenldap_eOpenLDAPError;
+
+VALUE ropenldap_rbmURI;
 
 
 /* --------------------------------------------------------------
@@ -108,16 +111,25 @@ ropenldap_log( const char *level, const char *fmt, va_dcl )
  * resultcode.
  */
 void
-ropenldap_check_result( LDAP *ldp, int resultcode, const char *func )
+#ifdef HAVE_STDARG_PROTOTYPES
+ropenldap_check_result( int resultcode, const char *func, ... )
+#else
+ropenldap_check_result( int resultcode, const char *func, va_dcl )
+#endif
 {
+	char buf[BUFSIZ];
+	va_list args;
 	VALUE exception_class = Qnil;
 
 	if ( resultcode == LDAP_SUCCESS ) return;
 
+	va_init_list( args, func );
+	vsnprintf( buf, BUFSIZ, func, args );
+
 	exception_class =
 		rb_funcall( ropenldap_eOpenLDAPError, rb_intern("subclass_for"), 1, INT2FIX(resultcode) );
 
-	rb_raise( exception_class, func );
+	rb_raise( exception_class, "%s", buf );
 }
 
 
@@ -126,7 +138,7 @@ ropenldap_check_result( LDAP *ldp, int resultcode, const char *func )
  * warranted.
  */
 void
-ropenldap_check_opt_result( LDAP *ldp, int optresult, const char *opt )
+ropenldap_check_opt_result( int optresult, const char *opt )
 {
 	if ( optresult == LDAP_OPT_SUCCESS ) return;
 	rb_raise( rb_eRuntimeError, "Failed to set option %s: %d", opt, optresult );
@@ -136,7 +148,7 @@ ropenldap_check_opt_result( LDAP *ldp, int optresult, const char *opt )
 /*
  * Convert an array of string pointers to a Ruby Array of Strings.
  */
-static VALUE
+VALUE
 ropenldap_rb_string_array( char **strings )
 {
 	VALUE ary = rb_ary_new();
@@ -171,7 +183,7 @@ ropenldap_rb_string_array( char **strings )
  * - crit_exts
  */
 static VALUE
-ropenldap_s_split_url( VALUE _, VALUE urlstring )
+ropenldap_s_split_url( VALUE UNUSED(module), VALUE urlstring )
 {
 	const char *url = StringValueCStr( urlstring );
 	LDAPURLDesc *urldesc;
@@ -247,7 +259,7 @@ ropenldap_s_split_url( VALUE _, VALUE urlstring )
  *
  */
 static VALUE
-ropenldap_s_err2string( VALUE _, VALUE resultcode )
+ropenldap_s_err2string( VALUE UNUSED(module), VALUE resultcode )
 {
 	int err = FIX2INT( resultcode );
 	char *string = ldap_err2string( err );
@@ -260,6 +272,9 @@ ropenldap_s_err2string( VALUE _, VALUE resultcode )
 void
 Init_openldap_ext( void )
 {
+	rb_require( "uri" );
+	ropenldap_rbmURI = rb_const_get( rb_cObject, rb_intern("URI") );
+
 	rb_require( "openldap" );
 	ropenldap_mOpenLDAP = rb_define_module( "OpenLDAP" );
 	ropenldap_mOpenLDAPLoggable = rb_define_module_under( ropenldap_mOpenLDAP, "Loggable" );

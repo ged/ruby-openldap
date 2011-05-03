@@ -4,7 +4,7 @@ require 'mkmf'
 require 'fileutils'
 
 if ENV['MAINTAINER_MODE']
-	$stderr.puts "Maintainer mode enabled."
+	$stderr.puts "** Maintainer mode enabled. **"
 	$CFLAGS << ' -Wall' << ' -ggdb' << ' -DDEBUG'
 end
 

@@ -129,14 +129,15 @@ ropenldap_get_conn( VALUE self )
  * -------------------------------------------------------------- */
 
 /*
- *  call-seq:
- *     OpenLDAP::Connection.allocate   -> store
+ * call-seq:
+ *    OpenLDAP::Connection.allocate   -> store
  *
- *  Allocate a new OpenLDAP::Connection object.
+ * Allocate a new OpenLDAP::Connection object.
  *
  */
 static VALUE
-ropenldap_conn_s_allocate( VALUE klass ) {
+ropenldap_conn_s_allocate( VALUE klass )
+{
 	return Data_Wrap_Struct( klass, ropenldap_conn_gc_mark, ropenldap_conn_gc_free, 0 );
 }
 
@@ -146,33 +147,38 @@ ropenldap_conn_s_allocate( VALUE klass ) {
  * -------------------------------------------------------------- */
 
 /*
- *  call-seq:
- *     OpenLDAP::Connection.new( url )           -> conn
+ * call-seq:
+ *    OpenLDAP::Connection.new( *uris )           -> conn
  *
- *  Create a new OpenLDAP::Connection object using the given +url+.
+ * Create a new OpenLDAP::Connection object using the given +uris+.
  *
  */
 static VALUE
-ropenldap_conn_initialize( VALUE self, VALUE urlstring ) {
+ropenldap_conn_initialize( VALUE self, VALUE urls )
+{
 	ropenldap_log_obj( self, "debug", "Initializing 0x%x", self );
 
 	if ( !check_conn(self) ) {
+		VALUE urlstring;
 		LDAP *ldp = NULL;
-		char *url = StringValueCStr( urlstring );
+		char *url = NULL;
 		struct ropenldap_connection *conn;
 		int result = 0;
 		int proto_ver = 3;
+
+		urlstring = rb_funcall( urls, rb_intern("join"), 1, rb_str_new(" ", 1) );
+		url = RSTRING_PTR( rb_obj_as_string(urlstring) );
 
 		if ( !ldap_is_ldap_url(url) )
 			rb_raise( rb_eArgError, "'%s' is not an LDAP url", url );
 
 		ropenldap_log_obj( self, "info", "Creating a new %s (%s)", rb_obj_classname(self), url );
 		result = ldap_initialize( &ldp, url );
-		ropenldap_check_result( ldp, result, "ldap_initialize" );
+		ropenldap_check_result( result, "ldap_initialize( \"%s\" )", url );
 
 		ropenldap_log_obj( self, "debug", "  setting protocol to LDAPv3." );
 		result = ldap_set_option( ldp, LDAP_OPT_PROTOCOL_VERSION, &proto_ver );
-		ropenldap_check_opt_result( ldp, result, "LDAP_OPT_PROTOCOL_VERSION" );
+		ropenldap_check_opt_result( result, "LDAP_OPT_PROTOCOL_VERSION" );
 
 		conn = DATA_PTR( self ) = ropenldap_conn_alloc( ldp );
 
@@ -185,6 +191,47 @@ ropenldap_conn_initialize( VALUE self, VALUE urlstring ) {
 }
 
 
+/*
+ * Turn a STRING_T into a URI object via URI::parse.
+ */
+static VALUE
+ropenldap_parse_uri( VALUE string )
+{
+	StringValue( string );
+	return rb_funcall( ropenldap_rbmURI, rb_intern("parse"), 1, string );
+}
+
+
+/*
+ * call-seq:
+ *     connection.uris   -> array
+ *
+ * Gets an Array of URIs to be contacted by the library when trying to establish 
+ * a connection.
+ *
+ */
+static VALUE
+ropenldap_conn_uris( VALUE self )
+{
+	struct ropenldap_connection *ptr = ropenldap_get_conn( self );
+	char *uris;
+	VALUE uristring, uriarray;
+	int result;
+
+	result = ldap_get_option( ptr->ldap, LDAP_OPT_URI, &uris );
+	ropenldap_check_opt_result( result, "LDAP_OPT_PROTOCOL_VERSION" );
+
+	/* Convert to strings first, then collect them into URI objects */
+	uristring = rb_str_new2( uris );
+	ldap_memfree( uris );
+
+	uriarray = rb_funcall( uristring, rb_intern("split"), 0 );
+	rb_block_call( uriarray, rb_intern("collect!"), 0, NULL, 
+	               ropenldap_parse_uri, Qnil );
+
+	return uriarray;
+}
+
 
 
 
@@ -192,7 +239,8 @@ ropenldap_conn_initialize( VALUE self, VALUE urlstring ) {
  * OpenLDAP Connection class
  */
 void
-ropenldap_init_connection( void ) {
+ropenldap_init_connection( void )
+{
 	ropenldap_log( "debug", "Initializing OpenLDAP::Connection" );
 
 #ifdef FOR_RDOC
@@ -206,7 +254,10 @@ ropenldap_init_connection( void ) {
 
 	rb_define_alloc_func( ropenldap_cOpenLDAPConnection, ropenldap_conn_s_allocate );
 
-	rb_define_method( ropenldap_cOpenLDAPConnection, "initialize", ropenldap_conn_initialize, 1 );
+	rb_define_method( ropenldap_cOpenLDAPConnection, "initialize", ropenldap_conn_initialize, -2 );
+
+	rb_define_method( ropenldap_cOpenLDAPConnection, "uris", ropenldap_conn_uris, 0 );
+
 
 }
 

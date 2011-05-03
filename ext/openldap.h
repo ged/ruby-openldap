@@ -15,9 +15,13 @@
 #include <ruby.h>
 
 
+
 /* --------------------------------------------------------------
  * Globals
  * -------------------------------------------------------------- */
+
+/* Reference to the URI module */
+extern VALUE ropenldap_rbmURI;
 
 extern VALUE ropenldap_mOpenLDAP;
 extern VALUE ropenldap_mOpenLDAPLoggable;
@@ -33,8 +37,8 @@ extern VALUE ropenldap_eOpenLDAPError;
 
 /* OpenLDAP::Connection struct */
 struct ropenldap_connection {
-	LDAP	*ldap;
-	VALUE	connection;
+    LDAP    *ldap;
+    VALUE   connection;
 };
 
 
@@ -42,6 +46,15 @@ struct ropenldap_connection {
  * Macros
  * -------------------------------------------------------------- */
 #define IsConnection( obj ) rb_obj_is_kind_of( (obj), ropenldap_cOpenLDAPConnection )
+
+#ifdef UNUSED
+#elif defined(__GNUC__)
+# define UNUSED(x) UNUSED_ ## x __attribute__((unused))
+#elif defined(__LCLINT__)
+# define UNUSED(x) /*@unused@*/ x
+#else
+# define UNUSED(x) x
+#endif
 
 
 /* --------------------------------------------------------------
@@ -53,23 +66,26 @@ struct ropenldap_connection {
 #define va_init_list(a,b) va_start(a,b)
 void ropenldap_log_obj( VALUE, const char *, const char *, ... );
 void ropenldap_log( const char *, const char *, ... );
+void ropenldap_check_result( int, const char *, ... );
 #else
 #include <varargs.h>
 #define va_init_list(a,b) va_start(a)
 void ropenldap_log_obj( VALUE, const char *, const char *, va_dcl );
 void ropenldap_log( const char *, const char *, va_dcl );
+void ropenldap_check_result( int, va_dcl );
 #endif
 
-void ropenldap_check_result				_(( LDAP *, int, const char * ));
-void ropenldap_check_opt_result			_(( LDAP *, int, const char * ));
+void ropenldap_check_opt_result         _(( int, const char * ));
+
+VALUE ropenldap_rb_string_array         _(( char ** ));
 
 
 /* --------------------------------------------------------------
  * Initializers
  * -------------------------------------------------------------- */
 
-void Init_openldap_ext					_(( void ));
-void ropenldap_init_connection			_(( void ));
+void Init_openldap_ext                  _(( void ));
+void ropenldap_init_connection          _(( void ));
 
 
 #endif /* __OPENLDAP_H__ */
