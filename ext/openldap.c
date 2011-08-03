@@ -140,8 +140,15 @@ ropenldap_check_result( int resultcode, const char *func, va_dcl )
 void
 ropenldap_check_opt_result( int optresult, const char *opt )
 {
+	VALUE exception_class = Qnil;
+
 	if ( optresult == LDAP_OPT_SUCCESS ) return;
-	rb_raise( rb_eRuntimeError, "Failed to set option %s: %d", opt, optresult );
+	if ( optresult == LDAP_OPT_ERROR )
+		rb_raise( rb_eRuntimeError, "Failed to get/set %s option!", opt );
+
+	exception_class =
+		rb_funcall( ropenldap_eOpenLDAPError, rb_intern("subclass_for"), 1, INT2FIX(optresult) );
+	rb_raise( exception_class, "while getting/setting %s", opt );
 }
 
 
@@ -268,6 +275,130 @@ ropenldap_s_err2string( VALUE UNUSED(module), VALUE resultcode )
 }
 
 
+/* Check to be sure the library that's dynamically-linked is the same
+ * one it was compiled against. */
+static void
+ropenldap_check_link()
+{
+	LDAPAPIInfo api;
+	api.ldapai_info_version = LDAP_API_INFO_VERSION;
+
+	if ( ldap_get_option(NULL, LDAP_OPT_API_INFO, &api) != LDAP_OPT_SUCCESS ) {
+		rb_warn( "ldap_get_option(API_INFO) failed" );
+		return;
+	}
+
+	if ( api.ldapai_info_version != LDAP_API_INFO_VERSION ) {
+		rb_warn( "LDAP APIInfo version mismatch: library %d, header %d",
+		         api.ldapai_info_version, LDAP_API_INFO_VERSION );
+	}
+
+	if ( api.ldapai_api_version != LDAP_API_VERSION ) {
+		rb_warn( "LDAP API version mismatch: library %d, header %d",
+		         api.ldapai_api_version, LDAP_API_VERSION );
+	}
+
+	if ( strcmp(api.ldapai_vendor_name, LDAP_VENDOR_NAME ) != 0 ) {
+		rb_warn( "LDAP vendor name mismatch: library %s, header %s\n",
+		         api.ldapai_vendor_name, LDAP_VENDOR_NAME );
+	}
+
+	if( api.ldapai_vendor_version != LDAP_VENDOR_VERSION ) {
+		rb_warn( "LDAP vendor version mismatch: library %d, header %d\n",
+		         api.ldapai_vendor_version, LDAP_VENDOR_VERSION );
+	}
+
+	ropenldap_log( "info", "LDAP library: %s %d",
+		           LDAP_VENDOR_NAME, LDAP_VENDOR_VERSION );
+
+	ldap_memfree( api.ldapai_vendor_name );
+	ber_memvfree( (void **)api.ldapai_extensions );
+}
+
+
+/*
+ * call-seq:
+ *    OpenLDAP.api_info   -> hash
+ *
+ * Return a Hash describing the API version, vendor, extensions, etc.
+ *
+ *    conn.api_info
+ *    # => {:api_version=>3001, :protocol_version=>3, :extensions=>["X_OPENLDAP"], 
+ *          :vendor_name=>"OpenLDAP", :vendor_version=>20424} (using ==)
+ */
+static VALUE
+ropenldap_api_info( VALUE self )
+{
+	VALUE rval = rb_hash_new();
+	LDAPAPIInfo info;
+	info.ldapai_info_version = LDAP_API_INFO_VERSION;
+
+	if ( ldap_get_option(NULL, LDAP_OPT_API_INFO, &info) != LDAP_SUCCESS )
+		rb_raise( ropenldap_eOpenLDAPError, "ldap_get_option(API_INFO) failed." );
+
+	rb_hash_aset( rval, ID2SYM(rb_intern("api_version")), INT2FIX(info.ldapai_api_version) );
+	rb_hash_aset( rval, ID2SYM(rb_intern("protocol_version")), INT2FIX(info.ldapai_protocol_version) );
+	rb_hash_aset( rval, ID2SYM(rb_intern("extensions")), ropenldap_rb_string_array(info.ldapai_extensions) );
+	rb_hash_aset( rval, ID2SYM(rb_intern("vendor_name")), rb_str_new2(info.ldapai_vendor_name) );
+	rb_hash_aset( rval, ID2SYM(rb_intern("vendor_version")), INT2FIX(info.ldapai_vendor_version) );
+
+	ldap_memfree( info.ldapai_vendor_name );
+	ber_memvfree( (void **)info.ldapai_extensions );
+
+	return rval;
+}
+
+
+/*
+ * call-seq:
+ *    OpenLDAP.api_feature_info   -> hash
+ *
+ * Returns a hash of the versions of the extensions in .api_info[:extensions]
+ *
+ *    conn.api_feature_info
+ *    # => 
+ */
+static VALUE
+ropenldap_api_feature_info( VALUE self )
+{
+	VALUE rval = rb_hash_new();
+	int i;
+	LDAPAPIInfo info;
+	info.ldapai_info_version = LDAP_API_INFO_VERSION;
+
+	if ( ldap_get_option(NULL, LDAP_OPT_API_INFO, &info) != LDAP_SUCCESS )
+		rb_raise( ropenldap_eOpenLDAPError, "ldap_get_option(API_INFO) failed." );
+
+	for( i=0; info.ldapai_extensions[i] != NULL; i++ ) {
+		LDAPAPIFeatureInfo fi;
+		fi.ldapaif_info_version = LDAP_FEATURE_INFO_VERSION;
+		fi.ldapaif_name = info.ldapai_extensions[i];
+		fi.ldapaif_version = 0;
+
+		if ( ldap_get_option(NULL, LDAP_OPT_API_FEATURE_INFO, &fi) == LDAP_SUCCESS ) {
+			if(fi.ldapaif_info_version == LDAP_FEATURE_INFO_VERSION) {
+				rb_hash_aset( rval, rb_str_new2(fi.ldapaif_name), INT2FIX(fi.ldapaif_version) );
+			} else {
+				ropenldap_log( "warn", "Feature info version mismatch for %s; expected %d, got %d",
+				               fi.ldapaif_name, LDAP_FEATURE_INFO_VERSION, fi.ldapaif_info_version );
+				rb_hash_aset( rval, rb_str_new2(fi.ldapaif_name), Qnil );
+			}
+		} else {
+			ldap_memfree( info.ldapai_vendor_name );
+			ber_memvfree( (void **)info.ldapai_extensions );
+			rb_raise( ropenldap_eOpenLDAPError, "ldap_get_option(API_FEATURE_INFO) failed." );
+		}
+	}
+
+	ldap_memfree( info.ldapai_vendor_name );
+	ber_memvfree( (void **)info.ldapai_extensions );
+
+	return rval;
+}
+
+
+
+
 
 void
 Init_openldap_ext( void )
@@ -277,8 +408,9 @@ Init_openldap_ext( void )
 
 	rb_require( "openldap" );
 	ropenldap_mOpenLDAP = rb_define_module( "OpenLDAP" );
-	ropenldap_mOpenLDAPLoggable = rb_define_module_under( ropenldap_mOpenLDAP, "Loggable" );
 
+	rb_require( "openldap/mixins" );
+	ropenldap_mOpenLDAPLoggable = rb_define_module_under( ropenldap_mOpenLDAP, "Loggable" );
 	ropenldap_eOpenLDAPError = rb_define_class_under( ropenldap_mOpenLDAP, "Error", rb_eRuntimeError );
 
 	/* Constants */
@@ -354,6 +486,9 @@ Init_openldap_ext( void )
 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_VLV_ERROR", INT2FIX(LDAP_VLV_ERROR) );
 #endif
 
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_OPT_SUCCESS", INT2FIX(LDAP_OPT_SUCCESS) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_OPT_ERROR", INT2FIX(LDAP_OPT_ERROR) );
+
 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_OTHER", INT2FIX(LDAP_OTHER) );
 
 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SERVER_DOWN", INT2FIX(LDAP_SERVER_DOWN) );
@@ -378,8 +513,13 @@ Init_openldap_ext( void )
 	/* Module functions */
 	rb_define_singleton_method( ropenldap_mOpenLDAP, "split_url", ropenldap_s_split_url, 1 );
 	rb_define_singleton_method( ropenldap_mOpenLDAP, "err2string", ropenldap_s_err2string, 1 );
+	rb_define_singleton_method( ropenldap_mOpenLDAP, "api_info", ropenldap_api_info, 0 );
+	rb_define_singleton_method( ropenldap_mOpenLDAP, "api_feature_info", ropenldap_api_feature_info, 0 );
 
 	/* Initialize the other parts of the extension */
 	ropenldap_init_connection();
+
+	/* Detect mismatched linking */
+	ropenldap_check_link();
 }
 

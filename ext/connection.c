@@ -234,7 +234,6 @@ ropenldap_conn_uris( VALUE self )
 
 
 
-
 /*
  * OpenLDAP Connection class
  */
@@ -257,7 +256,5 @@ ropenldap_init_connection( void )
 	rb_define_method( ropenldap_cOpenLDAPConnection, "initialize", ropenldap_conn_initialize, -2 );
 
 	rb_define_method( ropenldap_cOpenLDAPConnection, "uris", ropenldap_conn_uris, 0 );
-
-
 }
 

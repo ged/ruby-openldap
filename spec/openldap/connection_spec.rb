@@ -25,10 +25,6 @@ describe OpenLDAP::Connection do
 	end
 
 
-	TEST_LDAP_URI = URI( 'ldap://localhost' )
-
-	TEST_LDAP_URI2 = URI( 'ldap://ldap.example.com' )
-
 	it "can be created with an LDAP URI" do
 		conn = OpenLDAP::Connection.new( TEST_LDAP_URI )
 		conn.uris.should == [ TEST_LDAP_URI ]
@@ -40,8 +36,8 @@ describe OpenLDAP::Connection do
 	end
 
 	it "can be created with several LDAP URIs" do
-		conn = OpenLDAP::Connection.new( TEST_LDAP_URI, TEST_LDAP_URI2 )
-		conn.uris.should == [ TEST_LDAP_URI, TEST_LDAP_URI2 ]
+		conn = OpenLDAP::Connection.new( TEST_LDAP_URI, TEST_LOCAL_LDAP_URI )
+		conn.uris.should == [ TEST_LDAP_URI, TEST_LOCAL_LDAP_URI ]
 	end
 
 	describe "a connection instance" do

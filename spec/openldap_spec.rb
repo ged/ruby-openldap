@@ -68,5 +68,16 @@ describe OpenLDAP do
 		result[3].should be_tainted()
 	end
 
+	it "has a method for examining the API info of the library it's linked against" do
+		OpenLDAP.api_info.should be_a( Hash )
+		OpenLDAP.api_info.should include( :api_version, :protocol_version, :extensions, 
+		                                  :vendor_name, :vendor_version )
+	end
+
+	it "has a hash of extension versions for the library it's linked against" do
+		OpenLDAP.api_feature_info.should be_a( Hash )
+		OpenLDAP.api_feature_info.should include( *OpenLDAP.api_info[:extensions] )
+	end
+
 end
 
