@@ -55,16 +55,14 @@ hoespec = Hoe.spec 'openldap' do
 
 	self.developer 'Michael Granger', 'ged@FaerieMUD.org'
 
-	self.extra_dev_deps.push *{
-		'rake-compiler' => '~> 0.7',
-		'rspec'         => '~> 2.4',
-	}
+	self.dependency 'rake-compiler', '~> 0.7', :developer
+	self.dependency 'rspec',         '~> 2.6', :developer
 
 	self.spec_extras[:licenses] = ["BSD"]
 	self.spec_extras[:signing_key] = '/Volumes/Keys/ged-private_gem_key.pem'
 	self.spec_extras[:extensions] = [ EXTDIR + 'extconf.rb' ]
 
-	self.require_ruby_version( '>= 1.8.7' )
+	self.require_ruby_version( '>= 1.9.2' )
 
 	self.hg_sign_tags = true if self.respond_to?( :hg_sign_tags= )
 	self.yard_opts = [ '--protected', '--verbose' ] if self.respond_to?( :yard_opts= )
