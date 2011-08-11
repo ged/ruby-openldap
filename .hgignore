@@ -3,3 +3,4 @@
 
 \.conf$
 ^doc/
+^pkg/

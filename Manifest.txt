@@ -1,3 +1,4 @@
+.gemtest
 History.md
 Manifest.txt
 README.md

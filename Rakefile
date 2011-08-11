@@ -22,6 +22,8 @@ SPECDIR = BASEDIR + 'spec'
 LIBDIR  = BASEDIR + 'lib'
 EXTDIR  = BASEDIR + 'ext'
 
+EXTCONF = EXTDIR + 'extconf.rb'
+
 DLEXT   = Config::CONFIG['DLEXT']
 EXT     = LIBDIR + "bluecloth_ext.#{DLEXT}"
 
@@ -60,7 +62,7 @@ hoespec = Hoe.spec 'openldap' do
 
 	self.spec_extras[:licenses] = ["BSD"]
 	self.spec_extras[:signing_key] = '/Volumes/Keys/ged-private_gem_key.pem'
-	self.spec_extras[:extensions] = [ EXTDIR + 'extconf.rb' ]
+	self.spec_extras[:extensions] = [ EXTCONF.to_s ]
 	self.extra_rdoc_files += ['ext/connection.c', 'ext/openldap.c']
 
 	self.require_ruby_version( '>= 1.9.2' )
