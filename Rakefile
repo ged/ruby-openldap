@@ -61,12 +61,11 @@ hoespec = Hoe.spec 'openldap' do
 	self.spec_extras[:licenses] = ["BSD"]
 	self.spec_extras[:signing_key] = '/Volumes/Keys/ged-private_gem_key.pem'
 	self.spec_extras[:extensions] = [ EXTDIR + 'extconf.rb' ]
+	self.extra_rdoc_files += ['ext/connection.c', 'ext/openldap.c']
 
 	self.require_ruby_version( '>= 1.9.2' )
 
 	self.hg_sign_tags = true if self.respond_to?( :hg_sign_tags= )
-	self.yard_opts = [ '--protected', '--verbose' ] if self.respond_to?( :yard_opts= )
-
 	self.rdoc_locations << "deveiate:/usr/local/www/public/code/#{remote_rdoc_dir}"
 end
 
@@ -117,14 +116,14 @@ namespace :spec do
 		cmd = [ 'gdb' ] + GDB_OPTIONS
 		cmd += [ '--args' ]
 		cmd += RSPEC_CMD
-		run( *cmd )
+		system( *cmd )
 	end
 
 	desc "Run the specs under Valgrind."
 	task :valgrind do
 		cmd = [ 'valgrind' ] + VALGRIND_OPTIONS
 		cmd += RSPEC_CMD
-		run( *cmd )
+		system( *cmd )
 	end
 
 end

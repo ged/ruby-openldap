@@ -6,6 +6,7 @@
 #define __OPENLDAP_H__
 
 #include <stdio.h>
+#include <math.h>
 #include <string.h>
 #include <inttypes.h>
 #include <assert.h>
@@ -14,7 +15,7 @@
 
 #include <ruby.h>
 
-
+#include "extconf.h"
 
 /* --------------------------------------------------------------
  * Globals
@@ -74,8 +75,6 @@ void ropenldap_log_obj( VALUE, const char *, const char *, va_dcl );
 void ropenldap_log( const char *, const char *, va_dcl );
 void ropenldap_check_result( int, va_dcl );
 #endif
-
-void ropenldap_check_opt_result         _(( int, const char * ));
 
 VALUE ropenldap_rb_string_array         _(( char ** ));
 

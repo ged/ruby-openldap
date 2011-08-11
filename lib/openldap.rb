@@ -2,7 +2,9 @@
 
 # The namespace for OpenLDAP classes.
 # 
-# @author Michael Granger <ged@FaerieMUD.org>
+# == Authors
+# 
+# * Michael Granger <ged@FaerieMUD.org>
 # 
 module OpenLDAP
 
@@ -15,6 +17,7 @@ module OpenLDAP
 	require 'openldap/utils'
 
 	### Logging
+
 	# Log levels
 	LOG_LEVELS = {
 		'debug' => Logger::DEBUG,
@@ -88,8 +91,15 @@ module OpenLDAP
 
 	end
 
-	# Load the Ruby parts of the library
+	# Load the remaining Ruby parts of the library
 	require 'openldap/exceptions'
 
 end # module OpenLDAP
+
+
+# Allow some backward-compatibility with ruby-ldap
+unless defined?( ::LDAP )
+	::LDAP = ::OpenLDAP
+end
+
 

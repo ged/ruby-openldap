@@ -21,6 +21,7 @@ Additions or changes:
   - unsolicited notifications
   - continuation references
   - intermediate responses
+  - alias deferencing
   - etc.
 * Cleanly abandon terminated operations where supported
 * Memory-handling cleanup to avoid leaks, corruption, and other

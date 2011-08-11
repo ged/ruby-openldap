@@ -5,7 +5,7 @@ require 'fileutils'
 
 if ENV['MAINTAINER_MODE']
 	$stderr.puts "** Maintainer mode enabled. **"
-	$CFLAGS << ' -Wall' << ' -ggdb' << ' -DDEBUG'
+	$CFLAGS << ' -Wall' << ' -Wno-unused' << " -O0" << ' -ggdb' << ' -DDEBUG'
 end
 
 
@@ -18,4 +18,7 @@ find_library( 'ldap', 'ldap_initialize' ) or
 have_const( 'LDAP_API_VERSION', 'ldap.h' ) or
 	abort "no LDAP_API_VERSION constant defined"
 
+have_func( 'ldap_tls_inplace' )
+
+create_header()
 create_makefile( 'openldap_ext' )

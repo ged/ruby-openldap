@@ -8,7 +8,7 @@ require 'openldap' unless defined?( OpenLDAP )
 module OpenLDAP # :nodoc:
 
 	# A alternate formatter for Logger instances.
-	class LogFormatter < Logger::Formatter
+	class LogFormatter < Logger::Formatter # :nodoc:
 
 		# The format to output unless debugging is turned on
 		DEFAULT_FORMAT = "[%1$s.%2$06d %3$d/%4$s] %5$5s -- %7$s\n"
@@ -64,7 +64,7 @@ module OpenLDAP # :nodoc:
 
 	# An alternate formatter for Logger instances that outputs +dd+ HTML
 	# fragments.
-	class HtmlLogFormatter < Logger::Formatter
+	class HtmlLogFormatter < Logger::Formatter # :nodoc:
 		include ERB::Util  # for html_escape()
 
 		# The default HTML fragment that'll be used as the template for each log message.

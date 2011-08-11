@@ -134,25 +134,6 @@ ropenldap_check_result( int resultcode, const char *func, va_dcl )
 
 
 /*
- * Raise an appropriate exception for the given option +resultcode+ if one is
- * warranted.
- */
-void
-ropenldap_check_opt_result( int optresult, const char *opt )
-{
-	VALUE exception_class = Qnil;
-
-	if ( optresult == LDAP_OPT_SUCCESS ) return;
-	if ( optresult == LDAP_OPT_ERROR )
-		rb_raise( rb_eRuntimeError, "Failed to get/set %s option!", opt );
-
-	exception_class =
-		rb_funcall( ropenldap_eOpenLDAPError, rb_intern("subclass_for"), 1, INT2FIX(optresult) );
-	rb_raise( exception_class, "while getting/setting %s", opt );
-}
-
-
-/*
  * Convert an array of string pointers to a Ruby Array of Strings.
  */
 VALUE
@@ -327,7 +308,7 @@ ropenldap_check_link()
  *          :vendor_name=>"OpenLDAP", :vendor_version=>20424} (using ==)
  */
 static VALUE
-ropenldap_api_info( VALUE self )
+ropenldap_s_api_info( VALUE self )
 {
 	VALUE rval = rb_hash_new();
 	LDAPAPIInfo info;
@@ -359,7 +340,7 @@ ropenldap_api_info( VALUE self )
  *    # => 
  */
 static VALUE
-ropenldap_api_feature_info( VALUE self )
+ropenldap_s_api_feature_info( VALUE self )
 {
 	VALUE rval = rb_hash_new();
 	int i;
@@ -397,6 +378,28 @@ ropenldap_api_feature_info( VALUE self )
 }
 
 
+/*
+ * call-seq:
+ *    OpenLDAP.uris   -> array
+ *
+ * Return 
+ *
+ *    example code
+ */
+static VALUE
+ropenldap_s_uris( VALUE self )
+{
+	VALUE rval;
+	char *uris;
+
+	if ( ldap_get_option(NULL, LDAP_OPT_URI, &uris) != LDAP_SUCCESS )
+		rb_raise( ropenldap_eOpenLDAPError, "ldap_get_option(URI) failed." );
+
+	rval = rb_str_new2( uris );
+	ldap_memfree( uris );
+
+	return rb_funcall( rval, rb_intern("split"), 1, rb_str_new(" ", 1) );
+}
 
 
 
@@ -411,12 +414,28 @@ Init_openldap_ext( void )
 
 	rb_require( "openldap/mixins" );
 	ropenldap_mOpenLDAPLoggable = rb_define_module_under( ropenldap_mOpenLDAP, "Loggable" );
-	ropenldap_eOpenLDAPError = rb_define_class_under( ropenldap_mOpenLDAP, "Error", rb_eRuntimeError );
+	ropenldap_eOpenLDAPError =
+		rb_define_class_under( ropenldap_mOpenLDAP, "Error", rb_eRuntimeError );
 
 	/* Constants */
 
 	/* versions */
 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_API_VERSION", INT2FIX(LDAP_API_VERSION) );
+
+	/* Ports */
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_PORT", INT2FIX(LDAP_PORT) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAPS_PORT", INT2FIX(LDAPS_PORT) );
+
+	/* RFC constants */
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_ROOT_DSE", rb_str_new2(LDAP_ROOT_DSE) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_NO_ATTRS", rb_str_new2(LDAP_NO_ATTRS) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_ALL_USER_ATTRIBUTES",
+	                 rb_str_new2(LDAP_ALL_USER_ATTRIBUTES) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_ALL_OPERATIONAL_ATTRIBUTES",
+				     rb_str_new2(LDAP_ALL_OPERATIONAL_ATTRIBUTES) );
+
+	/* RFC4511 maxInt */
+ 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_MAXINT", INT2NUM(LDAP_MAXINT) );
 
 	/* search scopes */
 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SCOPE_BASE", INT2FIX(LDAP_SCOPE_BASE) );
@@ -510,11 +529,23 @@ Init_openldap_ext( void )
 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_REFERRAL_LIMIT_EXCEEDED", INT2FIX(LDAP_REFERRAL_LIMIT_EXCEEDED) );
 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_X_CONNECTING", INT2FIX(LDAP_X_CONNECTING) );
 
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_OPT_X_TLS_NEVER", INT2FIX(LDAP_OPT_X_TLS_NEVER) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_OPT_X_TLS_HARD", INT2FIX(LDAP_OPT_X_TLS_HARD) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_OPT_X_TLS_DEMAND", INT2FIX(LDAP_OPT_X_TLS_DEMAND) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_OPT_X_TLS_ALLOW", INT2FIX(LDAP_OPT_X_TLS_ALLOW) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_OPT_X_TLS_TRY", INT2FIX(LDAP_OPT_X_TLS_TRY) );
+
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_OPT_X_TLS_CRL_NONE", INT2FIX(LDAP_OPT_X_TLS_CRL_NONE) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_OPT_X_TLS_CRL_PEER", INT2FIX(LDAP_OPT_X_TLS_CRL_PEER) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_OPT_X_TLS_CRL_ALL", INT2FIX(LDAP_OPT_X_TLS_CRL_ALL) );
+
 	/* Module functions */
 	rb_define_singleton_method( ropenldap_mOpenLDAP, "split_url", ropenldap_s_split_url, 1 );
 	rb_define_singleton_method( ropenldap_mOpenLDAP, "err2string", ropenldap_s_err2string, 1 );
-	rb_define_singleton_method( ropenldap_mOpenLDAP, "api_info", ropenldap_api_info, 0 );
-	rb_define_singleton_method( ropenldap_mOpenLDAP, "api_feature_info", ropenldap_api_feature_info, 0 );
+	rb_define_singleton_method( ropenldap_mOpenLDAP, "api_info", ropenldap_s_api_info, 0 );
+	rb_define_singleton_method( ropenldap_mOpenLDAP, "api_feature_info", ropenldap_s_api_feature_info, 0 );
+
+	rb_define_singleton_method( ropenldap_mOpenLDAP, "uris", ropenldap_s_uris, 0 );
 
 	/* Initialize the other parts of the extension */
 	ropenldap_init_connection();

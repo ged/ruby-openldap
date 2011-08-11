@@ -1,0 +1,2 @@
+uri: ldap://ldap.example.com
+base: "dc=example,dc=com"
