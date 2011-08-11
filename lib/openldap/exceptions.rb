@@ -107,7 +107,7 @@ module OpenLDAP
 	### and inheriting from +superclass+.
 	def self::def_ldap_exception( classname, result_code, superclass=OpenLDAP::Error )
 		eclass = Class.new( superclass ) do
-			def initialize( message=nil )
+			def initialize( message=nil ) # :nodoc:
 				ldapmsg = OpenLDAP.err2string( self.class.result_code )
 				ldapmsg += ': ' + message if message
 				super( ldapmsg )

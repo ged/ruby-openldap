@@ -304,8 +304,9 @@ ropenldap_check_link()
  * Return a Hash describing the API version, vendor, extensions, etc.
  *
  *    conn.api_info
- *    # => {:api_version=>3001, :protocol_version=>3, :extensions=>["X_OPENLDAP"], 
- *          :vendor_name=>"OpenLDAP", :vendor_version=>20424} (using ==)
+ *    # => {:api_version=>3001, :protocol_version=>3, 
+ *          :extensions=>["X_OPENLDAP", "THREAD_SAFE", "X_OPENLDAP_THREAD_SAFE"], 
+ *          :vendor_name=>"OpenLDAP", :vendor_version=>20423}
  */
 static VALUE
 ropenldap_s_api_info( VALUE self )
@@ -337,7 +338,7 @@ ropenldap_s_api_info( VALUE self )
  * Returns a hash of the versions of the extensions in .api_info[:extensions]
  *
  *    conn.api_feature_info
- *    # => 
+ *    # => {"X_OPENLDAP"=>20423, "THREAD_SAFE"=>1, "X_OPENLDAP_THREAD_SAFE"=>1}
  */
 static VALUE
 ropenldap_s_api_feature_info( VALUE self )
@@ -382,9 +383,10 @@ ropenldap_s_api_feature_info( VALUE self )
  * call-seq:
  *    OpenLDAP.uris   -> array
  *
- * Return 
+ * Return an Array of URIs to be contacted by the library when trying to establish a connection.
  *
- *    example code
+ *    OpenLDAP.uris
+ *    # => ['ldap://ldap.example.com:389']
  */
 static VALUE
 ropenldap_s_uris( VALUE self )

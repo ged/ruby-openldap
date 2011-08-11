@@ -38,14 +38,13 @@ module OpenLDAP
 
 
 	class << self
-		# @return [Logger::Formatter] the log formatter that will be used when the logging 
-		#    subsystem is reset
+		# The log formatter that will be used when the logging subsystem is reset
 		attr_accessor :default_log_formatter
 
-		# @return [Logger] the logger that will be used when the logging subsystem is reset
+		# the logger that will be used when the logging subsystem is reset
 		attr_accessor :default_logger
 
-		# @return [Logger] the logger that's currently in effect
+		# the logger that's currently in effect
 		attr_accessor :logger
 		alias_method :log, :logger
 		alias_method :log=, :logger=
@@ -53,7 +52,6 @@ module OpenLDAP
 
 
 	### Reset the global logger object to the default
-	### @return [void]
 	def self::reset_logger
 		self.logger = self.default_logger
 		self.logger.level = Logger::WARN
@@ -69,7 +67,6 @@ module OpenLDAP
 
 
 	### Get the library version.
-	### @return [String] the library's version
 	def self::version_string( include_buildnum=false )
 		vstring = "%s %s" % [ self.name, VERSION ]
 		vstring << " (build %s)" % [ REVISION[/: ([[:xdigit:]]+)/, 1] || '0' ] if include_buildnum
