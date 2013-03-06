@@ -70,7 +70,7 @@ describe OpenLDAP do
 
 	it "has a method for examining the API info of the library it's linked against" do
 		OpenLDAP.api_info.should be_a( Hash )
-		OpenLDAP.api_info.should include( :api_version, :protocol_version, :extensions, 
+		OpenLDAP.api_info.should include( :api_version, :protocol_version, :extensions,
 		                                  :vendor_name, :vendor_version )
 	end
 

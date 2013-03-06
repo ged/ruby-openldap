@@ -1,10 +1,17 @@
 #!/usr/bin/env ruby
 
 require 'uri'
+require 'loggability'
 require 'openldap' unless defined?( OpenLDAP )
 
 # OpenLDAP Connection class
 class OpenLDAP::Connection
+	extend Loggability
+
+
+	# Loggability API -- log to the :openldap logger
+	log_to :openldap
+
 
 	# Default options for new OpenLDAP::Connections.
 	DEFAULT_OPTIONS = {
@@ -14,7 +21,7 @@ class OpenLDAP::Connection
 	# Default TLS options to set before STARTTLS
 	DEFAULT_TLS_OPTIONS = {}
 
-	# Mapping of names of TLS peer certificate-checking strategies into Fixnum values used by 
+	# Mapping of names of TLS peer certificate-checking strategies into Fixnum values used by
 	# the underlying library.
 	TLS_REQUIRE_CERT_STRATEGIES = {
 		:never  => OpenLDAP::LDAP_OPT_X_TLS_NEVER,
@@ -27,7 +34,7 @@ class OpenLDAP::Connection
 	# Inverse of TLS_REQUIRE_CERT_STRATEGIES
 	TLS_REQUIRE_CERT_STRATEGY_NAMES = TLS_REQUIRE_CERT_STRATEGIES.invert
 
-	# Mapping of names of TLS CRL evaluation strategies into Fixnum values used by 
+	# Mapping of names of TLS CRL evaluation strategies into Fixnum values used by
 	# the underlying library.
 	TLS_CRL_CHECK_STRATEGIES = {
 		:none => OpenLDAP::LDAP_OPT_X_TLS_CRL_NONE,
@@ -102,15 +109,15 @@ class OpenLDAP::Connection
 	### Set the current peer certificate-checking +strategy+ (a Symbol). One of:
 	###
 	### [:never]  This is the default. The library will not ask the peer for a certificate.
-	### [:allow]  The peer certificate is requested. If no certificate is provided, the session 
-	###           proceeds normally. If a bad certificate is provided, it will be ignored and the 
+	### [:allow]  The peer certificate is requested. If no certificate is provided, the session
+	###           proceeds normally. If a bad certificate is provided, it will be ignored and the
 	###           session proceeds normally.
 	### [:try]    The peer certificate is requested. If no certificate is provided, the session
 	###           proceeds normally. If a bad certificate is provided, the session is immediately
 	###           terminated.
-	### [:demand] The peer certificate is requested. If no certificate is provided, or a bad 
+	### [:demand] The peer certificate is requested. If no certificate is provided, or a bad
 	###           certificate is provided, the session is immediately terminated.
-    ###          
+    ###
 	### Note that a valid client certificate is required in order to use the SASL EXTERNAL
 	### authentication mechanism with a TLS session. As such, a non-default
 	### setting must be chosen to enable SASL EXTERNAL authentication.
@@ -131,7 +138,7 @@ class OpenLDAP::Connection
 
 
 	### Specify if the Certificate Revocation List (CRL) of the CA should be used to check
-	### if the client certificates have been revoked or not. This option is ignored with GNUtls. 
+	### if the client certificates have been revoked or not. This option is ignored with GNUtls.
 	### +strategy+ can be specified as one of the following:
 	###
 	### [:none]   No CRL checks are performed
@@ -146,7 +153,7 @@ class OpenLDAP::Connection
 	end
 
 
-	### Fetch an IO object wrapped around the file descriptor the library is using to 
+	### Fetch an IO object wrapped around the file descriptor the library is using to
 	### communicate with the directory. Returns +nil+ if the connection hasn't yet
 	### been established.
 	def socket
@@ -166,7 +173,7 @@ class OpenLDAP::Connection
 	#######
 
 	### Strip all but the schema, host, and port from the given +url+ and return it as a
-	### String. 
+	### String.
 	def simplify_url( url )
 		url = URI( url ) unless url.is_a?( URI )
 		simpleurl = URI::Generic.build( :scheme => url.scheme, :host => url.host, :port => url.port )

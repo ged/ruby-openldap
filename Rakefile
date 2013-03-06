@@ -22,10 +22,9 @@ SPECDIR = BASEDIR + 'spec'
 LIBDIR  = BASEDIR + 'lib'
 EXTDIR  = BASEDIR + 'ext'
 
-EXTCONF = EXTDIR + 'extconf.rb'
-
-DLEXT   = Config::CONFIG['DLEXT']
+DLEXT   = RbConfig::CONFIG['DLEXT']
 EXT     = LIBDIR + "bluecloth_ext.#{DLEXT}"
+RUBY    = RbConfig.expand( "$(prefix)/$(ruby_install_name)" )
 
 VALGRIND_OPTIONS = [
 	"--num-callers=50",
@@ -58,12 +57,10 @@ hoespec = Hoe.spec 'openldap' do
 	self.developer 'Michael Granger', 'ged@FaerieMUD.org'
 
 	self.dependency 'rake-compiler', '~> 0.7', :developer
-	self.dependency 'rspec',         '~> 2.6', :developer
+	self.dependency 'hoe-deveiate',  '~> 0.2', :developer
 
 	self.spec_extras[:licenses] = ["BSD"]
-	self.spec_extras[:signing_key] = '/Volumes/Keys/ged-private_gem_key.pem'
-	self.spec_extras[:extensions] = [ EXTCONF.to_s ]
-	self.extra_rdoc_files += ['ext/connection.c', 'ext/openldap.c']
+	# self.spec_extras[:extensions] = [ 'lib/openldap' ]
 
 	self.require_ruby_version( '>= 1.9.2' )
 
@@ -96,17 +93,8 @@ task :maint do
 	ENV['MAINTAINER_MODE'] = 'yes'
 end
 
-ENV['RUBY_CC_VERSION'] = '1.8.7:1.9.2'
-
 # Rake-compiler task
-Rake::ExtensionTask.new do |ext|
-	ext.name           = 'openldap_ext'
-	ext.gem_spec       = hoespec.spec
-	ext.ext_dir        = 'ext'
-	ext.source_pattern = "*.{c,h}"
-	ext.cross_compile  = true
-	ext.cross_platform = %w[i386-mswin32 i386-mingw32]
-end
+Rake::ExtensionTask.new( 'openldap_ext' )
 
 
 namespace :spec do
@@ -128,23 +116,6 @@ namespace :spec do
 		system( *cmd )
 	end
 
-end
-
-### Make the ChangeLog update if the repo has changed since it was last built
-file '.hg/branch'
-file 'ChangeLog' => '.hg/branch' do |task|
-	$stderr.puts "Updating the changelog..."
-	content = nil
-
-	begin
-		content = make_changelog()
-	rescue NoMethodError
-		abort "Releasing requires the hoe-mercurial plugin (gem install hoe-mercurial)"
-	end
-
-	File.open( task.name, 'w', 0644 ) do |fh|
-		fh.print( content )
-	end
 end
 
 # Rebuild the ChangeLog immediately before release

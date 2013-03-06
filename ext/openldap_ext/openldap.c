@@ -1,4 +1,3 @@
-
 /*
  * Ruby-OpenLDAP -- a Ruby binding to OpenLDAP's libldap
  * $Id$
@@ -304,8 +303,8 @@ ropenldap_check_link()
  * Return a Hash describing the API version, vendor, extensions, etc.
  *
  *    conn.api_info
- *    # => {:api_version=>3001, :protocol_version=>3, 
- *          :extensions=>["X_OPENLDAP", "THREAD_SAFE", "X_OPENLDAP_THREAD_SAFE"], 
+ *    # => {:api_version=>3001, :protocol_version=>3,
+ *          :extensions=>["X_OPENLDAP", "THREAD_SAFE", "X_OPENLDAP_THREAD_SAFE"],
  *          :vendor_name=>"OpenLDAP", :vendor_version=>20423}
  */
 static VALUE
@@ -437,7 +436,7 @@ Init_openldap_ext( void )
 				     rb_str_new2(LDAP_ALL_OPERATIONAL_ATTRIBUTES) );
 
 	/* RFC4511 maxInt */
- 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_MAXINT", INT2NUM(LDAP_MAXINT) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_MAXINT", INT2NUM(LDAP_MAXINT) );
 
 	/* search scopes */
 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SCOPE_BASE", INT2FIX(LDAP_SCOPE_BASE) );
@@ -453,7 +452,7 @@ Init_openldap_ext( void )
 	/* result codes */
 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SUCCESS", INT2FIX(LDAP_SUCCESS) );
 
- 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_OPERATIONS_ERROR", INT2FIX(LDAP_OPERATIONS_ERROR) );
+	rb_define_const( ropenldap_mOpenLDAP, "LDAP_OPERATIONS_ERROR", INT2FIX(LDAP_OPERATIONS_ERROR) );
 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_PROTOCOL_ERROR", INT2FIX(LDAP_PROTOCOL_ERROR) );
 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_TIMELIMIT_EXCEEDED", INT2FIX(LDAP_TIMELIMIT_EXCEEDED) );
 	rb_define_const( ropenldap_mOpenLDAP, "LDAP_SIZELIMIT_EXCEEDED", INT2FIX(LDAP_SIZELIMIT_EXCEEDED) );

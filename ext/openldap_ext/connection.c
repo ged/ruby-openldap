@@ -364,6 +364,7 @@ static VALUE
 ropenldap_conn_simple_bind( VALUE self, VALUE bind_dn, VALUE password )
 {
 	struct ropenldap_connection *ptr = ropenldap_get_conn( self );
+	/* TODO */
 	return Qnil;
 }
 
@@ -722,11 +723,11 @@ ropenldap_conn_tls_dhfile( VALUE self )
  * call-seq:
  *    conn.tls_dhfile = newvalue
  *
- * Set the path to a PEM-encoded Diffie-Hellman parameter file. If this is specified, DH key 
- * exchange will be used for the ephemeral keying. 
- * 
+ * Set the path to a PEM-encoded Diffie-Hellman parameter file. If this is specified, DH key
+ * exchange will be used for the ephemeral keying.
+ *
  * You can use the 'openssl' command-line tool to generate the file like so:
- * 
+ *
  *   openssl dhparam -outform PEM -out dh1024.pem -5 1024
  */
 static VALUE
@@ -747,7 +748,7 @@ ropenldap_conn_tls_dhfile_eq( VALUE self, VALUE path )
  * call-seq:
  *    conn.tls_crlfile    -> string
  *
- * Get the current path to the file containing a Certificate Revocation List used for verifying that 
+ * Get the current path to the file containing a Certificate Revocation List used for verifying that
  * certificates have not been revoked.
  */
 static VALUE
@@ -772,7 +773,7 @@ ropenldap_conn_tls_crlfile( VALUE self )
  * call-seq:
  *    conn.tls_crlfile = path
  *
- * Set the path to the file containing a Certificate Revocation List used for verifying that 
+ * Set the path to the file containing a Certificate Revocation List used for verifying that
  * certificates have not been revoked. This value is only used when LDAP has been compiled
  * to use GnuTLS.
  */

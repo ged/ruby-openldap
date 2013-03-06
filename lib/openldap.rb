@@ -1,69 +1,22 @@
-#!/usr/bin/env ruby
+# -*- ruby -*-
+#encoding: utf-8
 
-# The namespace for OpenLDAP classes.
-# 
-# == Authors
-# 
-# * Michael Granger <ged@FaerieMUD.org>
-# 
+require 'loggability'
+
+# A Ruby binding to OpenLDAP's libldap
 module OpenLDAP
+	extend Loggability
+
+
+	# Loggability API -- set up a logger for all openldap logs
+	log_as :openldap
+
 
 	# Library version constant
 	VERSION = '0.0.1'
 
 	# Version-control revision constant
 	REVISION = %q$Revision$
-
-	require 'openldap/utils'
-
-	### Logging
-
-	# Log levels
-	LOG_LEVELS = {
-		'debug' => Logger::DEBUG,
-		'info'  => Logger::INFO,
-		'warn'  => Logger::WARN,
-		'error' => Logger::ERROR,
-		'fatal' => Logger::FATAL,
-	}.freeze
-	LOG_LEVEL_NAMES = LOG_LEVELS.invert.freeze
-
-	@default_logger = Logger.new( $stderr )
-	@default_logger.level = $DEBUG ? Logger::DEBUG : Logger::WARN
-
-	@default_log_formatter = OpenLDAP::LogFormatter.new( @default_logger )
-	@default_logger.formatter = @default_log_formatter
-
-	@logger = @default_logger
-
-
-	class << self
-		# The log formatter that will be used when the logging subsystem is reset
-		attr_accessor :default_log_formatter
-
-		# the logger that will be used when the logging subsystem is reset
-		attr_accessor :default_logger
-
-		# the logger that's currently in effect
-		attr_accessor :logger
-		alias_method :log, :logger
-		alias_method :log=, :logger=
-	end
-
-
-	### Reset the global logger object to the default
-	def self::reset_logger
-		self.logger = self.default_logger
-		self.logger.level = Logger::WARN
-		self.logger.formatter = self.default_log_formatter
-	end
-
-
-	### Returns +true+ if the global logger has not been set to something other than
-	### the default one.
-	def self::using_default_logger?
-		return self.logger == self.default_logger
-	end
 
 
 	### Get the library version.
@@ -72,6 +25,7 @@ module OpenLDAP
 		vstring << " (build %s)" % [ REVISION[/: ([[:xdigit:]]+)/, 1] || '0' ] if include_buildnum
 		return vstring
 	end
+
 
 	### Load the extension
 	begin
@@ -92,11 +46,5 @@ module OpenLDAP
 	require 'openldap/exceptions'
 
 end # module OpenLDAP
-
-
-# Allow some backward-compatibility with ruby-ldap
-unless defined?( ::LDAP )
-	::LDAP = ::OpenLDAP
-end
 
 

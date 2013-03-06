@@ -12,7 +12,7 @@ module OpenLDAP
 	#
 	# The exception class hierarchy follows the error constants specified by the OpenLDAP
 	# client library, and looks like this:
-	# 
+	#
 	# * OpenLDAP::Error
 	#   * Referral
 	#   * OperationsError
@@ -95,7 +95,7 @@ module OpenLDAP
 
 		### Return the appropriate Exception class for the given +resultcode+.
 		### @param [Integer] resultcode  the result code from an ldap_* call.
-		### @return [Class] 
+		### @return [Class]
 		def self::subclass_for( resultcode )
 			return OpenLDAP::RESULT_EXCEPTION_CLASS[ resultcode ]
 		end
@@ -214,10 +214,10 @@ module OpenLDAP
 	RESULT_EXCEPTION_CLASS.default = OpenLDAP::OtherError
 
 	# API Error Codes
-	# 
+	#
 	# Based on draft-ietf-ldap-c-api-xx
 	# but with new negative code values
-	# 
+	#
 	class APIError < OpenLDAP::Error # :nodoc:
 	end
 
