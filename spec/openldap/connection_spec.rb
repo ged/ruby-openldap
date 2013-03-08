@@ -17,10 +17,12 @@ require 'openldap/connection'
 describe OpenLDAP::Connection do
 
 	before( :all ) do
-		setup_logging( :fatal )
+		setup_logging( :debug )
+		@slapd_pid = start_testing_slapd()
 	end
 
 	after( :all ) do
+		stop_testing_slapd( @slapd_pid )
 		reset_logging()
 	end
 
@@ -36,8 +38,8 @@ describe OpenLDAP::Connection do
 	end
 
 	it "can be created with several LDAP URIs" do
-		conn = OpenLDAP::Connection.new( TEST_LDAP_URI, TEST_LOCAL_LDAP_URI )
-		conn.uris.should == [ TEST_LDAP_URI, TEST_LOCAL_LDAP_URI ]
+		conn = OpenLDAP::Connection.new( TEST_LDAP_URI, TEST_LDAPS_URI )
+		conn.uris.should == [ TEST_LDAP_URI, TEST_LDAPS_URI ]
 	end
 
 	context "an instance" do
@@ -148,26 +150,23 @@ describe OpenLDAP::Connection do
 			@conn.fdno.should be_nil()
 		end
 
-	end
-
-
-	it "can start TLS negotiation synchronously", :with_ldap_server => true do
-		config = load_ldap_config()
-		uri = config['uri'] or abort "No 'uri' in the test config!"
-
-		conn = OpenLDAP::Connection.new( uri )
-		conn.start_tls
-	end
-
-	context "a connected instance", :with_ldap_server => true do
-
-		before( :all ) do
-			config = load_ldap_config()
-			@uri = config['uri'] or abort "No 'uri' in the test config!"
+		it "fails to start TLS with strict cert-checking enabled", :with_ldap_server => true do;
+			expect {
+				@conn.start_tls( :tls_require_cert => :demand )
+			}.to raise_error( OpenLDAP::ConnectError, /ldap_start_tls_s/i )
 		end
 
+		it "can start TLS negotiation synchronously", :with_ldap_server => true do;
+			@conn.start_tls( :tls_require_cert => :never )
+		end
+
+	end
+
+
+	context "a connected instance", :if => @slapd_pid do
+
 		before( :each ) do
-			@conn = OpenLDAP::Connection.new( @uri )
+			@conn = OpenLDAP::Connection.new( TEST_LDAP_URI )
 			@conn.start_tls
 		end
 

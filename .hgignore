@@ -5,3 +5,4 @@
 ^doc/
 ^pkg/
 ^ChangeLog$
+test_workdir/
