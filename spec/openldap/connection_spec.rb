@@ -10,7 +10,7 @@ require 'openldap/connection'
 describe OpenLDAP::Connection do
 
 	before( :all ) do
-		setup_logging()
+		setup_logging( :debug )
 		@slapd_pid = start_testing_slapd()
 	end
 
@@ -142,24 +142,26 @@ describe OpenLDAP::Connection do
 
 
 		it "fail to start TLS with strict cert-checking enabled" do
-			expect {
-				@conn.start_tls( :tls_require_cert => :demand )
-			}.to raise_error( OpenLDAP::ServerDown, /ldap_start_tls_s/i )
+			pending "figuring out how to set TLS options that take effect" do
+				expect {
+					@conn.tls_require_cert = :demand
+					@conn.start_tls
+				}.to raise_error()
+			end
 		end
 
 
-		it "can start TLS negotiation synchronously" do
-			# pending "Figuring out why this doesn't work" do
-				@conn.tls_cacertfile = 'test_workdir/example.pem'
-				@conn.start_tls( :tls_require_cert => :never )
-			# end
+		it "can set the TLS CA certificate file" do
+			@conn.tls_cacertfile = 'test_workdir/example.crt'
+			@conn.tls_cacertfile.should == 'test_workdir/example.crt'
 		end
 
 
 		context "that are connected" do
 
 			before( :each ) do
-				@conn.start_tls( :tls_require_cert => :never )
+				@conn.tls_require_cert = :never
+				@conn.start_tls
 			end
 
 			it "know what their file-descriptor number is" do
@@ -175,12 +177,19 @@ describe OpenLDAP::Connection do
 				@conn.socket.should be_binmode()
 			end
 
+			it "can bind anonymously" do
+				@conn.bind
+			end
+
 			it "can bind as a user" do
 				@conn.bind( TEST_ADMIN_ROOT_DN, TEST_ADMIN_PASSWORD ).should == true
 			end
 
-
-
+			it "raises an appropriate exception if unable to bind" do
+				expect {
+					@conn.bind( 'cn=nonexistant', 'nopenopenope' )
+				}.to raise_error( OpenLDAP::InvalidCredentials, /ldap_bind_s/i )
+			end
 		end
 
 	end

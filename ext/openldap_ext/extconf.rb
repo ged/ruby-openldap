@@ -10,8 +10,8 @@ end
 
 
 # if dirs = dir_config( 'openldap' )
-# 	$stderr.puts "Adding rpath pointing to #{dirs.last}lib"
-# 	$LDFLAGS << " -Wl,-rpath #{dirs.last}lib"
+#	$stderr.puts "Adding rpath pointing to #{dirs.last}lib"
+#	$LDFLAGS << " -Wl,-rpath #{dirs.last}lib"
 # end
 
 have_func 'rb_thread_call_without_gvl' or abort "no rb_thread_call_without_gvl()"

@@ -39,7 +39,6 @@ extern VALUE ropenldap_eOpenLDAPError;
 /* OpenLDAP::Connection struct */
 struct ropenldap_connection {
     LDAP    *ldap;
-    VALUE   connection;
 };
 
 
@@ -56,6 +55,8 @@ struct ropenldap_connection {
 #else
 # define UNUSED(x) x
 #endif
+
+
 
 
 /* --------------------------------------------------------------

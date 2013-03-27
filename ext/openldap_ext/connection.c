@@ -349,18 +349,38 @@ ropenldap_conn_network_timeout_eq( VALUE self, VALUE arg )
 
 /*
  * call-seq:
- *    conn.simple_bind( bind_dn, password )   -> result
- *    conn.simple_bind( bind_dn, password ) {|result| ... }
+ *    conn.bind( bind_dn, password )   -> result
+ *    conn.bind( bind_dn, password ) {|result| ... }
  *
  * Bind to the directory using a simple +bind_dn+ and a +password+.
  *
  */
 static VALUE
-ropenldap_conn_simple_bind( VALUE self, VALUE bind_dn, VALUE password )
+ropenldap_conn_bind( int argc, VALUE *argv, VALUE self )
 {
 	struct ropenldap_connection *ptr = ropenldap_get_conn( self );
-	/* TODO */
-	return Qnil;
+	VALUE bind_dn = Qnil, password = Qnil;
+	int res    = 0;
+	char *who  = NULL;
+	char *cred = NULL;
+
+	rb_scan_args( argc, argv, "02", &bind_dn, &password );
+
+	if ( bind_dn != Qnil ) {
+		who = StringValueCStr( bind_dn );
+	}
+
+	if ( password != Qnil ) {
+		cred = StringValueCStr( password );
+	}
+
+	/* TODO:  async for block form, sync otherwise */
+
+	/* TODO: SASL */
+	res = ldap_bind_s( ptr->ldap, who, cred, LDAP_AUTH_SIMPLE );
+	ropenldap_check_result( res, "ldap_bind_s" );
+
+	return Qtrue;
 }
 
 
@@ -1041,7 +1061,7 @@ ropenldap_init_connection( void )
 	rb_define_method( ropenldap_cOpenLDAPConnection, "uris", ropenldap_conn_uris, 0 );
 	rb_define_method( ropenldap_cOpenLDAPConnection, "fdno", ropenldap_conn_fdno, 0 );
 	rb_define_alias(  ropenldap_cOpenLDAPConnection, "fileno", "fdno" );
-	rb_define_method( ropenldap_cOpenLDAPConnection, "simple_bind", ropenldap_conn_simple_bind, 2 );
+	rb_define_method( ropenldap_cOpenLDAPConnection, "bind", ropenldap_conn_bind, -1 );
 
 	rb_define_method( ropenldap_cOpenLDAPConnection, "protocol_version",
 	                  ropenldap_conn_protocol_version, 0 );
