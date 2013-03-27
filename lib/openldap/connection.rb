@@ -171,7 +171,11 @@ class OpenLDAP::Connection
 
 	### Return a String representation of the object suitable for debugging.
 	def inspect
-		return "#<%p:%#016x %s>"
+		return "#<%p:%#016x %s>" % [
+			self.class,
+			self.object_id * 2,
+			self.uris.map( &:to_s ).join(', '),
+		]
 	end
 
 

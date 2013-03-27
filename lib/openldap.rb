@@ -49,7 +49,7 @@ module OpenLDAP
 	### Shortcut connection method: return a OpenLDAP::Connection object that will use
 	### the specified +urls+ (or )
 	def self::connect( *urls )
-		
+		return OpenLDAP::Connection.new( *urls )
 	end
 
 end # module OpenLDAP

@@ -35,10 +35,14 @@ describe OpenLDAP::Connection do
 		conn.uris.should == [ TEST_LDAP_URI, TEST_LDAPS_URI ]
 	end
 
-	context "instances" do
+	context "instance connected to #{TEST_LDAP_URI}" do
 
 		before( :each ) do
 			@conn = OpenLDAP::Connection.new( TEST_LDAP_URI )
+		end
+
+		it "includes its URL in its inspect output" do
+			@conn.inspect.should include( TEST_LDAP_STRING )
 		end
 
 		it "can set the cacert file used for TLS" do
