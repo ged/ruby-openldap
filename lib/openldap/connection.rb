@@ -53,7 +53,7 @@ class OpenLDAP::Connection
 		options = DEFAULT_OPTIONS.merge( options )
 
 		url_strings = urls.map( &self.method(:simplify_url) )
-		self._initialize( url_strings )
+		self._initialize( url_strings.join(' ') )
 
 		# Set options
 		options.each do |opt, val|
@@ -122,6 +122,7 @@ class OpenLDAP::Connection
 	### authentication mechanism with a TLS session. As such, a non-default
 	### setting must be chosen to enable SASL EXTERNAL authentication.
 	def tls_require_cert=( strategy )
+		self.log.debug "Setting require_cert to strategy: %p" % [ strategy ]
 		numeric_opt = TLS_REQUIRE_CERT_STRATEGIES[ strategy ] or
 			raise IndexError, "unknown TLS certificate-checking strategy %p" % [strategy]
 		self._tls_require_cert=( numeric_opt )
@@ -168,6 +169,12 @@ class OpenLDAP::Connection
 	end
 
 
+	### Return a String representation of the object suitable for debugging.
+	def inspect
+		return "#<%p:%#016x %s>"
+	end
+
+
 	#######
 	private
 	#######
@@ -177,7 +184,7 @@ class OpenLDAP::Connection
 	def simplify_url( url )
 		url = URI( url ) unless url.is_a?( URI )
 		simpleurl = URI::Generic.build( :scheme => url.scheme, :host => url.host, :port => url.port )
-		self.log.info "Simplified URL %s to: %s" % [ url, simpleurl ]
+		self.log.info "Simplified URL %s to: %s" % [ url, simpleurl ] if url.to_s != simpleurl.to_s
 
 		return simpleurl.to_s
 	end

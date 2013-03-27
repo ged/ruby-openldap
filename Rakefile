@@ -17,14 +17,17 @@ rescue LoadError
 end
 
 # Build constants
-BASEDIR = Pathname( __FILE__ ).dirname.relative_path_from( Pathname.pwd )
-SPECDIR = BASEDIR + 'spec'
-LIBDIR  = BASEDIR + 'lib'
-EXTDIR  = BASEDIR + 'ext'
+BASEDIR      = Pathname( __FILE__ ).dirname.relative_path_from( Pathname.pwd )
+SPECDIR      = BASEDIR + 'spec'
+LIBDIR       = BASEDIR + 'lib'
+EXTDIR       = BASEDIR + 'ext'
 
-DLEXT   = RbConfig::CONFIG['DLEXT']
-EXT     = LIBDIR + "bluecloth_ext.#{DLEXT}"
-RUBY    = RbConfig.expand( "$(prefix)/$(ruby_install_name)" )
+TEST_WORKDIR = BASEDIR + 'test_workdir'
+CLOBBER.include( TEST_WORKDIR.to_s )
+
+DLEXT        = RbConfig::CONFIG['DLEXT']
+EXT          = LIBDIR + "openldap_ext.#{DLEXT}"
+RUBY         = RbConfig.expand( "$(prefix)/$(ruby_install_name)" )
 
 VALGRIND_OPTIONS = [
 	"--num-callers=50",
@@ -43,7 +46,6 @@ GDB_OPTIONS = []
 
 # Load Hoe plugins
 Hoe.plugin :mercurial
-Hoe.plugin :yard
 Hoe.plugin :signing
 
 Hoe.plugins.delete :rubyforge
@@ -56,7 +58,7 @@ hoespec = Hoe.spec 'openldap' do
 
 	self.developer 'Michael Granger', 'ged@FaerieMUD.org'
 
-	self.dependency 'rake-compiler', '~> 0.7', :developer
+	self.dependency 'rake-compiler', '~> 0.8', :developer
 	self.dependency 'hoe-deveiate',  '~> 0.2', :developer
 
 	self.spec_extras[:licenses] = ["BSD"]

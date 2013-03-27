@@ -42,7 +42,6 @@
 #include "openldap.h"
 
 VALUE ropenldap_mOpenLDAP;
-VALUE ropenldap_mOpenLDAPLoggable;
 
 VALUE ropenldap_eOpenLDAPError;
 
@@ -414,7 +413,7 @@ Init_openldap_ext( void )
 	ropenldap_mOpenLDAP = rb_define_module( "OpenLDAP" );
 
 	rb_require( "openldap/mixins" );
-	ropenldap_mOpenLDAPLoggable = rb_define_module_under( ropenldap_mOpenLDAP, "Loggable" );
+
 	ropenldap_eOpenLDAPError =
 		rb_define_class_under( ropenldap_mOpenLDAP, "Error", rb_eRuntimeError );
 

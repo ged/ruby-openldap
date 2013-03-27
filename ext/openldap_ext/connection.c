@@ -150,14 +150,10 @@ ropenldap_conn_s_allocate( VALUE klass )
  * -------------------------------------------------------------- */
 
 /*
- * call-seq:
- *    OpenLDAP::Connection.new( *uris )           -> conn
- *
- * Create a new OpenLDAP::Connection object using the given +uris+.
- *
+ * Backend method for OpenLDAP::Connection#initialize.
  */
 static VALUE
-ropenldap_conn_initialize( VALUE self, VALUE urls )
+ropenldap_conn__initialize( VALUE self, VALUE urls )
 {
 	ropenldap_log_obj( self, "debug", "Initializing 0x%x", self );
 
@@ -167,9 +163,8 @@ ropenldap_conn_initialize( VALUE self, VALUE urls )
 		char *url = NULL;
 		struct ropenldap_connection *conn;
 		int result = 0;
-		int proto_ver = 3;
 
-		urlstring = rb_funcall( urls, rb_intern("join"), 1, rb_str_new(" ", 1) );
+		urlstring = rb_obj_as_string( urls );
 		url = RSTRING_PTR( rb_obj_as_string(urlstring) );
 
 		if ( !ldap_is_ldap_url(url) )
@@ -371,18 +366,19 @@ ropenldap_conn_simple_bind( VALUE self, VALUE bind_dn, VALUE password )
 
 /*
  * Start TLS synchronously; called from ropenldap_conn__start_tls after
- * the GIL is released.
+ * the GVL is released.
  */
-static VALUE
-ropenldap_conn__start_tls_body( void *ptr )
+static void *
+ropenldap_conn__start_tls_blocking( void *ptr )
 {
 	LDAP *ld = ptr;
-	return (VALUE)ldap_start_tls_s( ld, NULL, NULL );
+	int rval = ldap_start_tls_s( ld, NULL, NULL );
+	return (void *)(VALUE)rval;
 }
 
 
 /*
- * #_start_ls: backend of the #start_tls method.
+ * #_start_tls: backend of the #start_tls method.
  */
 static VALUE
 ropenldap_conn__start_tls( VALUE self )
@@ -392,8 +388,8 @@ ropenldap_conn__start_tls( VALUE self )
 	int result;
 
 	ropenldap_log_obj( self, "debug", "Starting TLS..." );
-	result = (int)rb_thread_blocking_region( ropenldap_conn__start_tls_body, (void *)ptr->ldap,
-		RUBY_UBF_IO, NULL );
+	result = (int)(VALUE)rb_thread_call_without_gvl( ropenldap_conn__start_tls_blocking,
+	                                                 (void *)ptr->ldap, RUBY_UBF_IO, NULL );
 	ropenldap_check_result( result, "ldap_start_tls_s" );
 	ropenldap_log_obj( self, "debug", "  TLS started." );
 
@@ -821,6 +817,8 @@ ropenldap_conn__tls_require_cert_eq( VALUE self, VALUE opt )
 	struct ropenldap_connection *ptr = ropenldap_get_conn( self );
 	const int optval = NUM2INT( opt );
 
+	ropenldap_log_obj( self, "debug", "Setting LDAP_OPT_X_TLS_REQUIRE_CERT to %d", optval );
+
 	if ( ldap_set_option(ptr->ldap, LDAP_OPT_X_TLS_REQUIRE_CERT, &optval) != LDAP_OPT_SUCCESS )
 		rb_raise( ropenldap_eOpenLDAPError, "couldn't set option: LDAP_OPT_X_TLS_REQUIRE_CERT" );
 
@@ -1034,12 +1032,11 @@ ropenldap_init_connection( void )
 	/* OpenLDAP::Connection */
 	ropenldap_cOpenLDAPConnection =
 		rb_define_class_under( ropenldap_mOpenLDAP, "Connection", rb_cObject );
-	rb_include_module( ropenldap_cOpenLDAPConnection, ropenldap_mOpenLDAPLoggable );
 
 	rb_define_alloc_func( ropenldap_cOpenLDAPConnection, ropenldap_conn_s_allocate );
 
 	rb_define_protected_method( ropenldap_cOpenLDAPConnection, "_initialize",
-	                            ropenldap_conn_initialize, -2 );
+	                            ropenldap_conn__initialize, 1 );
 
 	rb_define_method( ropenldap_cOpenLDAPConnection, "uris", ropenldap_conn_uris, 0 );
 	rb_define_method( ropenldap_cOpenLDAPConnection, "fdno", ropenldap_conn_fdno, 0 );

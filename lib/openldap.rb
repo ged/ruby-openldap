@@ -45,6 +45,13 @@ module OpenLDAP
 	# Load the remaining Ruby parts of the library
 	require 'openldap/exceptions'
 
+
+	### Shortcut connection method: return a OpenLDAP::Connection object that will use
+	### the specified +urls+ (or )
+	def self::connect( *urls )
+		
+	end
+
 end # module OpenLDAP
 
 

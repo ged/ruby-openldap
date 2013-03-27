@@ -9,7 +9,13 @@ if ENV['MAINTAINER_MODE']
 end
 
 
-dir_config( 'openldap' )
+# if dirs = dir_config( 'openldap' )
+# 	$stderr.puts "Adding rpath pointing to #{dirs.last}lib"
+# 	$LDFLAGS << " -Wl,-rpath #{dirs.last}lib"
+# end
+
+have_func 'rb_thread_call_without_gvl' or abort "no rb_thread_call_without_gvl()"
+have_func 'rb_thread_call_with_gvl' or abort "no rb_thread_call_with_gvl()"
 
 find_header( 'ldap.h' ) or
 	abort( "missing ldap.h; do you need to install a developer package?" )

@@ -1,23 +1,16 @@
 #!/usr/bin/env rspec -cfd -b
 
-BEGIN {
-	require 'pathname'
-	basedir = Pathname( __FILE__ ).dirname.parent.parent
-	libdir = basedir + 'lib'
+require_relative '../lib/helpers'
 
-	$LOAD_PATH.unshift( basedir.to_s ) unless $LOAD_PATH.include?( basedir.to_s )
-	$LOAD_PATH.unshift( libdir.to_s ) unless $LOAD_PATH.include?( libdir.to_s )
-}
-
+require 'pry'
 require 'uri'
 require 'rspec'
-require 'spec/lib/helpers'
 require 'openldap/connection'
 
 describe OpenLDAP::Connection do
 
 	before( :all ) do
-		setup_logging( :debug )
+		setup_logging()
 		@slapd_pid = start_testing_slapd()
 	end
 
@@ -42,7 +35,7 @@ describe OpenLDAP::Connection do
 		conn.uris.should == [ TEST_LDAP_URI, TEST_LDAPS_URI ]
 	end
 
-	context "an instance" do
+	context "instances" do
 
 		before( :each ) do
 			@conn = OpenLDAP::Connection.new( TEST_LDAP_URI )
@@ -138,49 +131,52 @@ describe OpenLDAP::Connection do
 			@conn.async_connect?.should be_false()
 		end
 
-	end
 
-	context "an unconnected instance" do
-
-		before( :each ) do
-			@conn = OpenLDAP::Connection.new( TEST_LDAP_URI )
-		end
-
-		it "knows that its file-descriptor is nil" do
+		it "know that their file-descriptors are nil" do
 			@conn.fdno.should be_nil()
 		end
 
-		it "fails to start TLS with strict cert-checking enabled", :with_ldap_server => true do;
+
+		it "fail to start TLS with strict cert-checking enabled" do
 			expect {
 				@conn.start_tls( :tls_require_cert => :demand )
-			}.to raise_error( OpenLDAP::ConnectError, /ldap_start_tls_s/i )
+			}.to raise_error( OpenLDAP::ServerDown, /ldap_start_tls_s/i )
 		end
 
-		it "can start TLS negotiation synchronously", :with_ldap_server => true do;
-			@conn.start_tls( :tls_require_cert => :never )
+
+		it "can start TLS negotiation synchronously" do
+			# pending "Figuring out why this doesn't work" do
+				@conn.tls_cacertfile = 'test_workdir/example.pem'
+				@conn.start_tls( :tls_require_cert => :never )
+			# end
 		end
 
-	end
+
+		context "that are connected" do
+
+			before( :each ) do
+				@conn.start_tls( :tls_require_cert => :never )
+			end
+
+			it "know what their file-descriptor number is" do
+				@conn.fdno.should be_a( Fixnum )
+				@conn.fdno.should > 2 # Something past STDERR
+			end
+
+			it "can return an IO for selecting against their file-descriptor" do
+				@conn.socket.should be_an( IO )
+				@conn.socket.fileno.should == @conn.fdno
+				@conn.socket.should_not be_autoclose()
+				@conn.socket.should_not be_close_on_exec()
+				@conn.socket.should be_binmode()
+			end
+
+			it "can bind as a user" do
+				@conn.bind( TEST_ADMIN_ROOT_DN, TEST_ADMIN_PASSWORD ).should == true
+			end
 
 
-	context "a connected instance", :if => @slapd_pid do
 
-		before( :each ) do
-			@conn = OpenLDAP::Connection.new( TEST_LDAP_URI )
-			@conn.start_tls
-		end
-
-		it "knows what its file-descriptor is" do
-			@conn.fdno.should be_a( Fixnum )
-			@conn.fdno.should > 2 # Something past STDERR
-		end
-
-		it "can return an IO for selecting against its file-descriptor" do
-			@conn.socket.should be_an( IO )
-			@conn.socket.fileno.should == @conn.fdno
-			@conn.socket.should_not be_autoclose()
-			@conn.socket.should_not be_close_on_exec()
-			@conn.socket.should be_binmode()
 		end
 
 	end

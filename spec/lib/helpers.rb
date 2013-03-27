@@ -1,6 +1,7 @@
 #!/usr/bin/ruby
 # coding: utf-8
 
+require 'erb'
 require 'pathname'
 require 'shellwords'
 require 'yaml'
@@ -11,7 +12,7 @@ require 'openssl'
 require 'openldap'
 require 'openldap/mixins'
 
-require 'spec/lib/constants'
+require_relative 'constants'
 
 
 ### RSpec helper functions.
@@ -24,8 +25,8 @@ module OpenLDAP::SpecHelpers
 
 	BASEDIR        = Pathname( __FILE__ ).dirname.parent.parent
 
-	TESTING_SLAPD_URI = 'ldap://localhost:6363'
-	TESTING_SLAPD_SSL_URI = 'ldaps://localhost:6364'
+	TESTING_SLAPD_URI = 'ldap://localhost:6363/dc=example,dc=com'
+	TESTING_SLAPD_SSL_URI = 'ldaps://localhost:6364/dc=example,dc=com'
 
 	TEST_WORKDIR   = BASEDIR + 'test_workdir'
 	TEST_DATADIR   = TEST_WORKDIR + 'data'
@@ -40,13 +41,14 @@ module OpenLDAP::SpecHelpers
 	### Start a localized slapd daemon for testing.
 	def start_testing_slapd
 
-		self.create_test_directories
-		self.copy_test_files
-		self.generate_ssl_cert
-		self.install_initial_data
-		slapd_pid = self.start_slapd
+		unless TEST_DATADIR.exist?
+			self.create_test_directories
+			self.copy_test_files
+			self.generate_ssl_cert
+			self.install_initial_data
+		end
 
-		return slapd_pid
+		return self.start_slapd
 	end
 
 
@@ -66,11 +68,6 @@ module OpenLDAP::SpecHelpers
 				$stderr.puts "  killed."
 			end
 		end
-
-		unless $DEBUG || ENV['MAINTAINER_MODE']
-			$stderr.puts "Cleaning up #{TEST_WORKDIR}..."
-			TEST_WORKDIR.rmtree
-		end
 	end
 
 
@@ -83,50 +80,60 @@ module OpenLDAP::SpecHelpers
 
 	### Copy over any files necessary for testing to the testing directory.
 	def copy_test_files
-		install SPEC_SLAPDCONF, TEST_WORKDIR
-		install SPEC_DBCONFIG, TEST_DATADIR
+		install_with_filter( SPEC_SLAPDCONF, TEST_WORKDIR, binding() )
+		install_with_filter( SPEC_DBCONFIG, TEST_DATADIR, binding )
+	end
+
+
+	### Copy the file from +source+ to +dest+ with ERB filtering using the given
+	### +filter_binding+.
+	def install_with_filter( source, dest, filter_binding )
+		dest = dest + source.basename if dest.directory?
+		contents = ERB.new( source.read(:encoding => 'UTF-8') )
+		dest.open( 'w' ) do |io|
+			io.print( contents.result(filter_binding) )
+		end
 	end
 
 
 	### Generate a self-signed cert for testing SSL/TlS connections
 	### Mostly stolen from https://gist.github.com/nickyp/886884
 	def generate_ssl_cert
-		key = OpenSSL::PKey::RSA.new( 1024 )
-		public_key = key.public_key
+		request_key  = TEST_WORKDIR + 'example.key.org'
+		cert_request = TEST_WORKDIR + 'example.csr'
+		signing_key  = TEST_WORKDIR + 'example.key'
+		cert         = TEST_WORKDIR + 'example.crt'
 
-		subject = "/CN=*.example.com"
+		unless File.exist?( cert )
+			system 'openssl', 'req',
+				'-new', '-newkey', 'rsa:4096',
+				'-days', '365', '-nodes', '-x509',
+				'-subj', '/C=US/ST=Oregon/L=Portland/O=IT/CN=localhost',
+				'-keyout', signing_key.to_s,
+				'-out', cert.to_s
 
-		cert = OpenSSL::X509::Certificate.new
-		cert.subject = cert.issuer = OpenSSL::X509::Name.parse( subject )
-		cert.not_before = Time.now
-		cert.not_after = Time.now + 365 * 24 * 60 * 60
-		cert.public_key = public_key
-		cert.serial = 0x0
-		cert.version = 2
+			system 'openssl', 'req',
+				'-new',
+				'-subj', '/C=US/ST=Oregon/L=Portland/O=IT/CN=localhost',
+				'-key', request_key.to_s,
+				'-out', cert_request.to_s
 
-		ef = OpenSSL::X509::ExtensionFactory.new
-		ef.subject_certificate = cert
-		ef.issuer_certificate = cert
-		cert.extensions = [
-			ef.create_extension( "basicConstraints", "CA:TRUE" , true ),
-			ef.create_extension( "subjectKeyIdentifier", "hash" ),
-			# ef.create_extension("keyUsage", "cRLSign,keyCertSign", true),
-		]
-		ext = ef.create_extension( "authorityKeyIdentifier", "keyid:always,issuer:always" )
-		cert.add_extension( ext )
+			system 'openssl', 'rsa',
+				'-in', request_key.to_s,
+				'-out', signing_key.to_s
 
-		cert.sign( key, OpenSSL::Digest::SHA1.new )
-
-		pemfile = TEST_WORKDIR + 'example.pem'
-		pemfile.open( 'w' ) {|io|
-			io.puts(cert.to_pem)
-			io.puts(key.to_pem)
-		}
+			system 'openssl', 'x509',
+				'-req', '-days', '365',
+				'-in', cert_request.to_s,
+				'-signkey', signing_key.to_s,
+				'-out', cert.to_s
+		end
 	end
 
 
 	### Install the initial testing data into the data dir in +TEST_WORKDIR+.
 	def install_initial_data
+		$stderr.print "Installing testing directory data..."
 		slapadd = self.find_binary( 'slapadd' )
 		ldiffile = SPEC_LDIF.to_s
 		configfile = TEST_WORKDIR + 'slapd.conf'
@@ -137,8 +144,10 @@ module OpenLDAP::SpecHelpers
 			'-l', ldiffile
 		]
 
+		$stderr.puts( ">>> ", Shellwords.join(cmd) )
 		system( *cmd, chdir: TEST_WORKDIR.to_s ) or
-		raise "Couldn't load initial data: #{Shellwords.join(cmd)}"
+			raise "Couldn't load initial data: #{Shellwords.join(cmd)}"
+		$stderr.puts "installed."
 	end
 
 
@@ -155,7 +164,7 @@ module OpenLDAP::SpecHelpers
 			'-h', "ldap://localhost:6363 ldaps://localhost:6364"
 		]
 
-		puts( Shellwords.join(cmd) )
+		$stderr.puts( ">>> ", Shellwords.join(cmd) )
 		pid = spawn( *cmd, chdir: TEST_WORKDIR.to_s, [:out,:err] => logio )
 
 		$stderr.puts "started at PID %d" % [ pid ]

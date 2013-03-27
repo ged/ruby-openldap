@@ -14,6 +14,7 @@
 #include <ldap.h>
 
 #include <ruby.h>
+#include <ruby/thread.h>
 
 #include "extconf.h"
 
@@ -25,7 +26,6 @@
 extern VALUE ropenldap_rbmURI;
 
 extern VALUE ropenldap_mOpenLDAP;
-extern VALUE ropenldap_mOpenLDAPLoggable;
 
 extern VALUE ropenldap_cOpenLDAPConnection;
 
