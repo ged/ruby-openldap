@@ -10,7 +10,7 @@ require 'openldap/connection'
 describe OpenLDAP::Connection do
 
 	before( :all ) do
-		setup_logging( :debug )
+		setup_logging()
 		@slapd_pid = start_testing_slapd()
 	end
 
@@ -188,7 +188,7 @@ describe OpenLDAP::Connection do
 			it "raises an appropriate exception if unable to bind" do
 				expect {
 					@conn.bind( 'cn=nonexistant', 'nopenopenope' )
-				}.to raise_error( OpenLDAP::InvalidCredentials, /ldap_bind_s/i )
+				}.to raise_error( OpenLDAP::InvalidCredentials, /bind/i )
 			end
 		end
 

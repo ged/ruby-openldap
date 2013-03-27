@@ -57,6 +57,21 @@ struct ropenldap_connection {
 #endif
 
 
+// BER stuff stolen from OpenLDAP's lber_pvt.h
+#define BER_BVC(s)		{ STRLENOF(s), (char *)(s) }
+#define BER_BVNULL		{ 0L, NULL }
+#define BER_BVZERO(bv) \
+	do { \
+		(bv)->bv_len = 0; \
+		(bv)->bv_val = NULL; \
+	} while (0)
+#define BER_BVSTR(bv,s)	\
+	do { \
+		(bv)->bv_len = STRLENOF(s); \
+		(bv)->bv_val = (s); \
+	} while (0)
+#define BER_BVISNULL(bv)	((bv)->bv_val == NULL)
+#define BER_BVISEMPTY(bv)	((bv)->bv_len == 0)
 
 
 /* --------------------------------------------------------------

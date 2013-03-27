@@ -362,7 +362,8 @@ ropenldap_conn_bind( int argc, VALUE *argv, VALUE self )
 	VALUE bind_dn = Qnil, password = Qnil;
 	int res    = 0;
 	char *who  = NULL;
-	char *cred = NULL;
+	struct berval cred = BER_BVNULL;
+	struct berval *s_cred = NULL;
 
 	rb_scan_args( argc, argv, "02", &bind_dn, &password );
 
@@ -371,14 +372,24 @@ ropenldap_conn_bind( int argc, VALUE *argv, VALUE self )
 	}
 
 	if ( password != Qnil ) {
-		cred = StringValueCStr( password );
+		VALUE pass_string = rb_obj_as_string( password );
+		cred.bv_val = ber_strdup( RSTRING_PTR(pass_string) );
+		cred.bv_len = RSTRING_LEN( pass_string );
 	}
 
 	/* TODO:  async for block form, sync otherwise */
 
-	/* TODO: SASL */
-	res = ldap_bind_s( ptr->ldap, who, cred, LDAP_AUTH_SIMPLE );
-	ropenldap_check_result( res, "ldap_bind_s" );
+	/* TODO: SASL interactive, ANONYMOUS (RFC2245?) */
+	// int ldap_sasl_bind_s(LDAP *ld, const char *dn, const char *mechanism,
+	//                      struct berval *cred, LDAPControl *sctrls[],
+	//                      LDAPControl *cctrls[], struct berval **servercredp);
+	res = ldap_sasl_bind_s( ptr->ldap, who, LDAP_SASL_SIMPLE,
+	                        &cred, NULL, NULL, &s_cred );
+	if ( !BER_BVISNULL(&cred) ) {
+		ber_memfree( cred.bv_val );
+		BER_BVZERO( &cred );
+	}
+	ropenldap_check_result( res, "ldap_sasl_bind_s" );
 
 	return Qtrue;
 }
