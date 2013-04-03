@@ -6,6 +6,7 @@ require 'fileutils'
 if ENV['MAINTAINER_MODE']
 	$stderr.puts "** Maintainer mode enabled. **"
 	$CFLAGS << ' -Wall' << ' -Wno-unused' << " -O0" << ' -ggdb' << ' -DDEBUG'
+	$LDFLAGS << ' -ggdb'
 end
 
 
