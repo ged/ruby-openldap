@@ -28,6 +28,7 @@ extern VALUE ropenldap_rbmURI;
 extern VALUE ropenldap_mOpenLDAP;
 
 extern VALUE ropenldap_cOpenLDAPConnection;
+extern VALUE ropenldap_cOpenLDAPResult;
 
 extern VALUE ropenldap_eOpenLDAPError;
 
@@ -41,11 +42,20 @@ struct ropenldap_connection {
     LDAP    *ldap;
 };
 
+/* OpenLDAP::Result struct */
+struct ropenldap_result {
+	LDAP        *ldap;
+	int         msgid;
+	LDAPMessage *message;
+	VALUE       connection;
+	VALUE       abandoned;
+};
 
 /* --------------------------------------------------------------
  * Macros
  * -------------------------------------------------------------- */
 #define IsConnection( obj ) rb_obj_is_kind_of( (obj), ropenldap_cOpenLDAPConnection )
+#define IsResult( obj ) rb_obj_is_kind_of( (obj), ropenldap_cOpenLDAPResult )
 
 #ifdef UNUSED
 #elif defined(__GNUC__)
@@ -101,6 +111,9 @@ VALUE ropenldap_rb_string_array         _(( char ** ));
 
 void Init_openldap_ext                  _(( void ));
 void ropenldap_init_connection          _(( void ));
+void ropenldap_init_result              _(( void ));
+
+struct ropenldap_connection *ropenldap_get_conn _(( VALUE ));
 
 
 #endif /* __OPENLDAP_H__ */

@@ -115,7 +115,7 @@ check_conn( VALUE self )
 /*
  * Fetch the data pointer and check it for sanity.
  */
-static struct ropenldap_connection *
+struct ropenldap_connection *
 ropenldap_get_conn( VALUE self )
 {
 	struct ropenldap_connection *conn = check_conn( self );

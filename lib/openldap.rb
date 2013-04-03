@@ -27,6 +27,31 @@ module OpenLDAP
 	end
 
 
+
+	### Create a new Connection object.
+	###
+	### :call-seq:
+	###   OpenLDAP.connection                      -> connection
+	###   OpenLDAP.connection( ldapurl )           -> connection
+	###   OpenLDAP.connection( host, port=389 )    -> connection
+	###
+	### If no argument is given, the defaults are used (OpenLDAP.uris).
+	def self::connection( *args )
+		case args.first
+		when NilClass
+			self.log.info "Connecting using defaults: %p" % [ self.uris ]
+			return OpenLDAP::Connection.new( self.uris.join(' ') )
+		when URI, /^ldap(i|s)?:/i
+			self.log.info "Connecting using an LDAP URL: %p" % [ args.first ]
+			return OpenLDAP::Connection.new( args.join(' ') )
+		else
+			self.log.info "Connecting using host/port" % [ args ]
+			uri = "ldap://%s:%d" % [ args.first, args[1] || 389 ]
+			return OpenLDAP::Connection.new( uri )
+		end
+	end
+
+
 	### Load the extension
 	begin
 		require 'openldap_ext'
@@ -41,6 +66,7 @@ module OpenLDAP
 		end
 
 	end
+
 
 	# Load the remaining Ruby parts of the library
 	require 'openldap/exceptions'
