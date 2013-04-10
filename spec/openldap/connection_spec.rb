@@ -1,6 +1,6 @@
 #!/usr/bin/env rspec -cfd -b
 
-require_relative '../lib/helpers'
+require_relative '../helpers'
 
 require 'pry'
 require 'uri'

@@ -1,16 +1,8 @@
 #!/usr/bin/env rspec -cfd -b
 
-BEGIN {
-	require 'pathname'
-	basedir = Pathname( __FILE__ ).dirname.parent.parent
-	libdir = basedir + 'lib'
-
-	$LOAD_PATH.unshift( basedir.to_s ) unless $LOAD_PATH.include?( basedir.to_s )
-	$LOAD_PATH.unshift( libdir.to_s ) unless $LOAD_PATH.include?( libdir.to_s )
-}
+require_relative '../helpers'
 
 require 'rspec'
-require 'spec/lib/helpers'
 require 'openldap/exceptions'
 
 describe OpenLDAP, "exceptions" do
