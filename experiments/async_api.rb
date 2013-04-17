@@ -18,5 +18,13 @@ conn.search( base_dn, filter, scope ) {|result| ... }
 # Single API, no async
 result = conn.search( base_dn, filter, scope )
 
-thr = Thread.new { conn.search( base_dn, filter, scope ) }
-result = thr.value
+result.next( -1 )
+result.next
+
+result.each -> iter
+
+
+conn.network_timeout = nil
+res = conn.search( ... )
+res.each
+

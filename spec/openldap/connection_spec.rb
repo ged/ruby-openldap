@@ -190,7 +190,28 @@ describe OpenLDAP::Connection do
 					@conn.bind( 'cn=nonexistant', 'nopenopenope' )
 				}.to raise_error( OpenLDAP::InvalidCredentials, /bind/i )
 			end
+
+
+			it "requires a base to search" do
+				expect {
+					@conn.search
+				}.to raise_error( ArgumentError, /0 for 1/i )
+			end
+
+			it "returns all entries under the base without a filter" do
+				result = @conn.search( TEST_BASE )
+				result.count.should == 3
+			end
+
+			it "raises an appropriate exception on an invalid filter" do
+				expect {
+					@conn.search( TEST_BASE, :subtree, "(objectClass=*" );
+				}.to raise_error( OpenLDAP::FilterError, /invalid/i )
+			end
+
+
 		end
+
 
 	end
 

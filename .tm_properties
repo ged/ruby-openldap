@@ -20,5 +20,6 @@ softTabs                 = false
 [ source.c ]
 tabSize                  = 4
 softTabs                 = false
+disableIndentCorrections = true
 
 

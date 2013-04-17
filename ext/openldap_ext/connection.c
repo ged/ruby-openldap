@@ -42,13 +42,15 @@
 #include "openldap.h"
 
 
-#define MILLION_F 1000000.0
-
-
 /* --------------------------------------------------------------
  * Declarations
  * -------------------------------------------------------------- */
 VALUE ropenldap_cOpenLDAPConnection;
+
+
+ID id_base;
+ID id_subtree;
+ID id_onelevel;
 
 
 /* --------------------------------------------------
@@ -115,7 +117,7 @@ check_conn( VALUE self )
 /*
  * Fetch the data pointer and check it for sanity.
  */
-struct ropenldap_connection *
+static struct ropenldap_connection *
 ropenldap_get_conn( VALUE self )
 {
 	struct ropenldap_connection *conn = check_conn( self );
@@ -125,6 +127,16 @@ ropenldap_get_conn( VALUE self )
 	return conn;
 }
 
+
+/*
+ * Fetch the LDAP handle from the OpenLDAP::Connection object +connection+.
+ */
+LDAP *
+ropenldap_conn_get_ldap( VALUE connection )
+{
+	struct ropenldap_connection *conn = check_conn( connection );
+	return conn->ldap;
+}
 
 
 /* --------------------------------------------------------------
@@ -178,7 +190,7 @@ ropenldap_conn__initialize( VALUE self, VALUE urls )
 
 	} else {
 		rb_raise( ropenldap_eOpenLDAPError,
-				  "Cannot re-initialize a store once it's been created." );
+				  "Cannot re-initialize a connection once it's been created." );
 	}
 
 	return Qnil;
@@ -349,6 +361,64 @@ ropenldap_conn_network_timeout_eq( VALUE self, VALUE arg )
 
 /*
  * call-seq:
+ *    conn.search_timeout   -> float or nil
+ *
+ * Returns the value that defines the time limit after which a search operation
+ * should be terminated by the server.
+ *
+ *    conn.search_timeout
+ *    # => 2.5
+ */
+static VALUE
+ropenldap_conn_search_timeout( VALUE self )
+{
+	struct ropenldap_connection *ptr = ropenldap_get_conn( self );
+	int timeout = 0;
+
+	if ( ldap_get_option(ptr->ldap, LDAP_OPT_TIMELIMIT, &timeout) != LDAP_OPT_SUCCESS )
+		rb_raise( ropenldap_eOpenLDAPError, "couldn't get option: LDAP_OPT_TIMELIMIT" );
+
+	if ( timeout ) {
+		ropenldap_log_obj( self, "debug", "Got  timeout: %d", timeout );
+		return INT2FIX( timeout );
+	} else {
+		ropenldap_log_obj( self, "debug", "No timeout." );
+		return Qnil;
+	}
+}
+
+
+/*
+ * call-seq:
+ *    conn.search_timeout = int or nil
+ *
+ * Set the the value that defines the time limit after which a search operation
+ * should be terminated by the server. Setting this to nil or -1 disables it.
+ *
+ *    conn.search_timeout = 10
+ */
+static VALUE
+ropenldap_conn_search_timeout_eq( VALUE self, VALUE arg )
+{
+	struct ropenldap_connection *ptr = ropenldap_get_conn( self );
+	int seconds = 0;
+
+	if ( NIL_P(arg) ) {
+		seconds = -1;
+	} else {
+		seconds = NUM2INT( arg );
+	}
+
+	ropenldap_log_obj( self, "debug", "Setting network timeout to %d seconds", seconds );
+	if ( ldap_set_option(ptr->ldap, LDAP_OPT_TIMELIMIT, &seconds) != LDAP_OPT_SUCCESS )
+		rb_raise( ropenldap_eOpenLDAPError, "couldn't set option: LDAP_OPT_TIMELIMIT" );
+
+	return arg;
+}
+
+
+/*
+ * call-seq:
  *    conn.bind( bind_dn, password )   -> result
  *    conn.bind( bind_dn, password ) {|result| ... }
  *
@@ -363,7 +433,7 @@ ropenldap_conn_bind( int argc, VALUE *argv, VALUE self )
 	int res    = 0;
 	char *who  = NULL;
 	struct berval cred = BER_BVNULL;
-	struct berval *s_cred = NULL;
+	int msgid  = 0;
 
 	rb_scan_args( argc, argv, "02", &bind_dn, &password );
 
@@ -380,15 +450,15 @@ ropenldap_conn_bind( int argc, VALUE *argv, VALUE self )
 	/* TODO:  async for block form, sync otherwise */
 
 	/* TODO: SASL interactive, ANONYMOUS (RFC2245?) */
-	// int ldap_sasl_bind_s(LDAP *ld, const char *dn, const char *mechanism,
-	//                      struct berval *cred, LDAPControl *sctrls[],
-	//                      LDAPControl *cctrls[], struct berval **servercredp);
-	res = ldap_sasl_bind_s( ptr->ldap, who, LDAP_SASL_SIMPLE,
-	                        &cred, NULL, NULL, &s_cred );
+	// int ldap_sasl_bind(LDAP *ld, const char *dn, const char *mechanism,
+	//               struct berval *cred, LDAPControl *sctrls[],
+	//               LDAPControl *cctrls[], int *msgidp);
+	res = ldap_sasl_bind( ptr->ldap, who, LDAP_SASL_SIMPLE, &cred, NULL, NULL, &msgid );
 	if ( !BER_BVISNULL(&cred) ) {
 		ber_memfree( cred.bv_val );
 		BER_BVZERO( &cred );
 	}
+	ropenldap_log_obj( self, "debug", "Rval from ldap_sasl_bind_a: %d", res );
 	ropenldap_check_result( res, "ldap_sasl_bind_s" );
 
 	return Qtrue;
@@ -1046,6 +1116,127 @@ ropenldap_conn_fdno( VALUE self )
 }
 
 
+/* Return the corresponding constant for the scope Symbol +scope+ */
+static int
+ropenldap_scope_symbol_to_int( VALUE scope )
+{
+	if ( SYM2ID(scope) == id_base ) {
+		return LDAP_SCOPE_BASE;
+	}
+
+	else if ( SYM2ID(scope) == id_subtree ) {
+		return LDAP_SCOPE_SUBTREE;
+	}
+
+	else if ( SYM2ID(scope) == id_onelevel ) {
+		return LDAP_SCOPE_ONELEVEL;
+	}
+
+	else {
+		rb_raise( rb_eArgError, "Invalid scope %s", RSTRING_PTR(rb_inspect(scope)) );
+	}
+}
+
+
+/* Utility method to derive a scope constant from a ruby scope argument
+   (e.g., :base, :onelevel, or their Fixnum equivalents) */
+static int
+ropenldap_get_scope( VALUE scope )
+{
+	switch( TYPE(scope) ) {
+		case T_SYMBOL:
+		  return ropenldap_scope_symbol_to_int( scope );
+		  break;
+
+		case T_FIXNUM:
+		  return FIX2INT( scope );
+
+		default:
+		  rb_raise( rb_eTypeError, "expected Fixnum or Symbol, got a %s",
+		            rb_obj_classname(scope) );
+	}
+
+	// Unreached
+	return 0;
+}
+
+
+/*
+ * call-seq:
+ *    conn.search( base, scope=:subtree, ... )   -> <return value>
+ *
+ * Execute a search given the args.
+ *
+ *    example code
+ */
+static VALUE
+ropenldap_conn_search( int argc, VALUE *argv, VALUE self )
+{
+	struct ropenldap_connection *ptr = ropenldap_get_conn( self );
+	VALUE rb_base        = Qnil,
+	      rb_scope       = Qnil,
+	      rb_filter      = Qnil,
+	      rb_attrs       = Qnil,
+	      rb_attrsonly   = Qnil,
+	      rb_serverctrls = Qnil,
+	      rb_clientctrls = Qnil,
+	      rb_timeout     = Qnil,
+	      rb_sizelimit   = Qnil;
+	char *base = NULL;
+	int scope = LDAP_SCOPE_SUBTREE;
+	char *filter = NULL;
+	char *attrs[] = {};
+	int attrsonly = 0;
+	LDAPControl *serverctrls[] = {}, *clientctrls[] = {};
+	struct timeval timeout = { 0, 0 };
+	int sizelimit = -1;
+	rb_encoding *utf8 = rb_utf8_encoding();
+
+	// Result
+	int rval = -1;
+	int msgid = 0;
+
+	ropenldap_log_obj( self, "debug", "Searching:" );
+	rb_scan_args( argc, argv, "18",
+	              &rb_base, &rb_scope, &rb_filter, &rb_attrs, &rb_attrsonly,
+				  &rb_serverctrls, &rb_clientctrls, &rb_timeout, &rb_sizelimit );
+
+	// Base
+	SafeStringValue( rb_base );
+	rb_base = rb_str_encode( rb_filter, rb_enc_from_encoding(utf8), 0, Qnil );
+	rb_gc_register_address( &rb_base );
+	base = StringValueCStr( rb_base );
+	ropenldap_log_obj( self, "debug", "  search base set to '%s'", base );
+
+	// Scope
+	if ( !NIL_P(rb_scope) ) scope = ropenldap_get_scope( rb_scope );
+	ropenldap_log_obj( self, "debug", "  search scope set to %d", scope );
+
+	// Filter
+	if ( !NIL_P(rb_filter) ) {
+		SafeStringValue( rb_filter );
+		rb_filter = rb_str_encode( rb_filter, rb_enc_from_encoding(utf8), 0, Qnil );
+		rb_gc_register_address( &rb_filter );
+		filter = StringValueCStr( rb_filter );
+	}
+
+	// Do the search
+	rval = ldap_search_ext( ptr->ldap, base, scope, filter, attrs, attrsonly,
+	                        serverctrls, clientctrls, &timeout, sizelimit,
+	                        &msgid );
+
+	// Release all of the strings we were using
+	rb_gc_unregister_address( &rb_base );
+	rb_gc_unregister_address( &rb_filter );
+
+	// Check the results of the search and raise if there was a problem
+	ropenldap_check_result( rval, "ldap_search_ext( %s, %d, %s )", base, scope, filter );
+
+	// Some other stuff
+
+	return Qnil;
+}
+
 
 
 /*
@@ -1059,6 +1250,10 @@ ropenldap_init_connection( void )
 #ifdef FOR_RDOC
 	ropenldap_mOpenLDAP = rb_define_module( "OpenLDAP" );
 #endif
+
+	id_base     = rb_intern_const( "base" );
+	id_subtree  = rb_intern_const( "subtree" );
+	id_onelevel = rb_intern_const( "onelevel" );
 
 	/* OpenLDAP::Connection */
 	ropenldap_cOpenLDAPConnection =
@@ -1074,6 +1269,10 @@ ropenldap_init_connection( void )
 	rb_define_alias(  ropenldap_cOpenLDAPConnection, "fileno", "fdno" );
 	rb_define_method( ropenldap_cOpenLDAPConnection, "bind", ropenldap_conn_bind, -1 );
 
+	rb_define_method( ropenldap_cOpenLDAPConnection, "search", ropenldap_conn_search, 1 );
+	rb_define_alias ( ropenldap_cOpenLDAPConnection, "search_ext", "search" );
+
+	/* Options */
 	rb_define_method( ropenldap_cOpenLDAPConnection, "protocol_version",
 	                  ropenldap_conn_protocol_version, 0 );
 	rb_define_method( ropenldap_cOpenLDAPConnection, "protocol_version=",
@@ -1087,10 +1286,20 @@ ropenldap_init_connection( void )
 	rb_define_method( ropenldap_cOpenLDAPConnection, "network_timeout=",
 	                  ropenldap_conn_network_timeout_eq, 1 );
 
+	rb_define_method( ropenldap_cOpenLDAPConnection, "search_timeout",
+	                  ropenldap_conn_search_timeout, 0 );
+	rb_define_method( ropenldap_cOpenLDAPConnection, "search_timeout=",
+	                  ropenldap_conn_search_timeout_eq, 1 );
+	rb_define_alias ( ropenldap_cOpenLDAPConnection, "timelimit", "search_timeout" );
+	// rb_define_method( ropenldap_cOpenLDAPConnection, "result_timeout",
+	//                   ropenldap_conn_result_timeout, 0 );
+	// rb_define_method( ropenldap_cOpenLDAPConnection, "result_timeout=",
+	//                   ropenldap_conn_result_timeout_eq, 1 );
+
 	rb_define_method( ropenldap_cOpenLDAPConnection, "tls_inplace?",
 	                  ropenldap_conn_tls_inplace_p, 0 );
 
-	/* Options */
+	/* TLS Options */
 	rb_define_method( ropenldap_cOpenLDAPConnection, "tls_cacertfile",
 	                  ropenldap_conn_tls_cacertfile, 0 );
 	rb_define_method( ropenldap_cOpenLDAPConnection, "tls_cacertfile=",
@@ -1136,6 +1345,8 @@ ropenldap_init_connection( void )
 
 	rb_define_method( ropenldap_cOpenLDAPConnection, "create_new_tls_context",
 	                  ropenldap_conn_create_new_tls_context, 0 );
+
+
 
 	/* Methods with Ruby front-ends */
 	rb_define_protected_method( ropenldap_cOpenLDAPConnection, "_start_tls",

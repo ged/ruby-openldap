@@ -6,7 +6,7 @@
  *
  * - Michael Granger <ged@FaerieMUD.org>
  *
- * Copyright (c) 2011 Michael Granger
+ * Copyright (c) 2011-2013 Michael Granger
  *
  * All rights reserved.
  *
@@ -60,11 +60,8 @@ static struct ropenldap_result *
 ropenldap_result_alloc( VALUE connection, int msgid )
 {
 	struct ropenldap_result *ptr = ALLOC( struct ropenldap_result );
-	struct ropenldap_connection *conn = ropenldap_get_conn( connection );
 
-	ptr->ldap       = conn->ldap;
 	ptr->msgid      = FIX2INT( msgid );
-	ptr->message    = NULL;
 	ptr->connection = connection;
 	ptr->abandoned  = Qfalse;
 
@@ -92,9 +89,7 @@ static void
 ropenldap_result_gc_free( struct ropenldap_result *ptr )
 {
 	if ( ptr ) {
-		ptr->ldap       = NULL;
 		ptr->msgid      = 0;
-		ptr->message    = NULL;
 		ptr->connection = Qnil;
 		ptr->abandoned  = Qfalse;
 
@@ -194,16 +189,54 @@ static VALUE
 ropenldap_result_abandon( int argc, VALUE *argv, VALUE self )
 {
 	struct ropenldap_result *ptr = ropenldap_get_result( self );
+	LDAP *ldap = ropenldap_conn_get_ldap( ptr->connection );
 	int res;
 
 	/* :TODO: controls */
 
-	res = ldap_abandon_ext( ptr->ldap, ptr->msgid, NULL, NULL );
+	res = ldap_abandon_ext( ldap, ptr->msgid, NULL, NULL );
 	ropenldap_check_result( res, "ldap_abandon_ext" );
 
 	return Qtrue;
 }
 
+
+/*
+ * call-seq:
+ *    next              -> message or nil
+ *    next( timeout )   -> message or nil
+ *
+ * Fetch the next result if it's ready.
+ *
+ */
+static VALUE
+ropenldap_result_next( int argc, VALUE *argv, VALUE self )
+{
+	struct ropenldap_result *ptr = ropenldap_get_result( self );
+	LDAP *ldap = ropenldap_conn_get_ldap( ptr->connection );
+	VALUE timeout = Qnil;
+	VALUE message = Qnil;
+	LDAPMessage *msg = NULL;
+	struct timeval c_timeout = { 0, 0 };
+	int res = 0;
+
+	rb_scan_args( argc, argv, "01", &timeout );
+
+	if ( !NIL_P(timeout) ) {
+		double seconds = NUM2DBL( timeout );
+		c_timeout.tv_sec = (time_t)floor( seconds );
+		c_timeout.tv_usec = (suseconds_t)( fmod(seconds, 1.0) * MILLION_F );
+	}
+
+	// int ldap_result( LDAP *ld, int msgid, int all,
+	//             struct timeval *timeout, LDAPMessage **result );
+	res = ldap_result( ldap, ptr->msgid, 0, &c_timeout, &msg );
+	ropenldap_check_result( res, "ldap_result" );
+
+	message = ropenldap_new_message( ptr->connection, msg );
+
+	return message;
+}
 
 
 
@@ -229,6 +262,7 @@ ropenldap_init_result( void )
 	                            ropenldap_result_initialize, 2 );
 
 	rb_define_method( ropenldap_cOpenLDAPResult, "abandon", ropenldap_result_abandon, -1 );
+	rb_define_method( ropenldap_cOpenLDAPResult, "next", ropenldap_result_next, -1 );
 
 	rb_require( "openldap/result" );
 }

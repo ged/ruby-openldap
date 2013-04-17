@@ -1,6 +1,8 @@
 #!/usr/bin/ruby
 # coding: utf-8
 
+require 'rspec'
+
 require 'erb'
 require 'pathname'
 require 'shellwords'
@@ -23,7 +25,7 @@ module OpenLDAP::SpecHelpers
 	include FileUtils::Verbose if $DEBUG || $VERBOSE
 
 
-	BASEDIR        = Pathname( __FILE__ ).dirname.parent.parent
+	BASEDIR        = Pathname( __FILE__ ).dirname.parent
 
 	TESTING_SLAPD_URI = 'ldap://localhost:6363/dc=example,dc=com'
 	TESTING_SLAPD_SSL_URI = 'ldaps://localhost:6364/dc=example,dc=com'
@@ -38,6 +40,13 @@ module OpenLDAP::SpecHelpers
 	SPEC_LDIF      = SPEC_DATADIR + 'testdata.ldif'
 
 
+	### Output the specified +msg+ if VERBOSE.
+	def trace( *msg )
+		# return unless $VERBOSE
+		$stderr.puts( *msg )
+	end
+
+
 	### Start a localized slapd daemon for testing.
 	def start_testing_slapd
 
@@ -46,6 +55,8 @@ module OpenLDAP::SpecHelpers
 			self.copy_test_files
 			self.generate_ssl_cert
 			self.install_initial_data
+		else
+			trace "Re-using existing test datadir #{TEST_DATADIR}"
 		end
 
 		return self.start_slapd
@@ -55,17 +66,17 @@ module OpenLDAP::SpecHelpers
 	### Stop the slapd started by #start_testing_slapd, if it's still alive.
 	def stop_testing_slapd( pid )
 		if pid
-			$stderr.puts "Shutting down slapd at PID %p" % [ pid ]
+			trace "Shutting down slapd at PID %p" % [ pid ]
 			begin
 				Process.kill( :TERM, pid )
 				Process.waitpid2( pid )
 			rescue Errno::ESRCH
-				$stderr.puts "  not running."
+				trace "  not running."
 				# Not running
 			rescue Errno::EPERM
-				$stderr.puts "  not allowed (not slapd?)."
+				trace "  not allowed (not slapd?)."
 			else
-				$stderr.puts "  killed."
+				trace "  killed."
 			end
 		end
 	end
@@ -73,6 +84,7 @@ module OpenLDAP::SpecHelpers
 
 	### Create the directory used for the testing instance of slapd.
 	def create_test_directories
+		trace "Creating test directory #{TEST_DATADIR}"
 		TEST_DATADIR.mkpath
 		return TEST_WORKDIR
 	end
@@ -99,7 +111,6 @@ module OpenLDAP::SpecHelpers
 	### Generate a self-signed cert for testing SSL/TlS connections
 	### Mostly stolen from https://gist.github.com/nickyp/886884
 	def generate_ssl_cert
-		request_key  = TEST_WORKDIR + 'example.key.org'
 		cert_request = TEST_WORKDIR + 'example.csr'
 		signing_key  = TEST_WORKDIR + 'example.key'
 		cert         = TEST_WORKDIR + 'example.crt'
@@ -115,11 +126,11 @@ module OpenLDAP::SpecHelpers
 			system 'openssl', 'req',
 				'-new',
 				'-subj', '/C=US/ST=Oregon/L=Portland/O=IT/CN=localhost',
-				'-key', request_key.to_s,
+				'-key', signing_key.to_s,
 				'-out', cert_request.to_s
 
 			system 'openssl', 'rsa',
-				'-in', request_key.to_s,
+				'-in', signing_key.to_s,
 				'-out', signing_key.to_s
 
 			system 'openssl', 'x509',
@@ -144,16 +155,16 @@ module OpenLDAP::SpecHelpers
 			'-l', ldiffile
 		]
 
-		$stderr.puts( ">>> ", Shellwords.join(cmd) )
+		trace ">>> ", Shellwords.join(cmd)
 		system( *cmd, chdir: TEST_WORKDIR.to_s ) or
 			raise "Couldn't load initial data: #{Shellwords.join(cmd)}"
-		$stderr.puts "installed."
+		trace "installed."
 	end
 
 
 	### Start the testing slapd and keep track of its PID.
 	def start_slapd
-		$stderr.print "Starting up testing slapd..."
+		trace "Starting up testing slapd..."
 		slapd = self.find_binary( 'slapd' )
 		logio = File.open( TEST_WORKDIR + 'slapd.log', 'w' )
 
@@ -164,10 +175,10 @@ module OpenLDAP::SpecHelpers
 			'-h', "ldap://localhost:6363 ldaps://localhost:6364"
 		]
 
-		$stderr.puts( ">>> ", Shellwords.join(cmd) )
+		trace ">>> ", Shellwords.join( cmd )
 		pid = spawn( *cmd, chdir: TEST_WORKDIR.to_s, [:out,:err] => logio )
 
-		$stderr.puts "started at PID %d" % [ pid ]
+		trace "started at PID %d" % [ pid ]
 		return pid
 	end
 

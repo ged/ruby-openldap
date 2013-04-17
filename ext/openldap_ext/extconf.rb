@@ -10,10 +10,10 @@ if ENV['MAINTAINER_MODE']
 end
 
 
-# if dirs = dir_config( 'openldap' )
-#	$stderr.puts "Adding rpath pointing to #{dirs.last}lib"
-#	$LDFLAGS << " -Wl,-rpath #{dirs.last}lib"
-# end
+inc_dir, lib_dir = dir_config( 'ldap' )
+if lib_dir
+	$LDFLAGS << " -L%s -Wl,-rpath,%s" % [ lib_dir, lib_dir ]
+end
 
 have_func 'rb_thread_call_without_gvl' or abort "no rb_thread_call_without_gvl()"
 have_func 'rb_thread_call_with_gvl' or abort "no rb_thread_call_with_gvl()"

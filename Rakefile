@@ -43,6 +43,10 @@ VALGRIND_MEMORYFILL_OPTIONS = [
 
 GDB_OPTIONS = []
 
+if Rake.application.trace
+	ENV['RUBYOPT'] = 'w'
+end
+
 
 # Load Hoe plugins
 Hoe.plugin :mercurial

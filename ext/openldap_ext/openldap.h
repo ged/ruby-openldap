@@ -15,6 +15,8 @@
 
 #include <ruby.h>
 #include <ruby/thread.h>
+#include <ruby/encoding.h>
+#include <ruby/intern.h>
 
 #include "extconf.h"
 
@@ -29,6 +31,7 @@ extern VALUE ropenldap_mOpenLDAP;
 
 extern VALUE ropenldap_cOpenLDAPConnection;
 extern VALUE ropenldap_cOpenLDAPResult;
+extern VALUE ropenldap_cOpenLDAPMessage;
 
 extern VALUE ropenldap_eOpenLDAPError;
 
@@ -39,23 +42,28 @@ extern VALUE ropenldap_eOpenLDAPError;
 
 /* OpenLDAP::Connection struct */
 struct ropenldap_connection {
-    LDAP    *ldap;
+    LDAP *ldap;
 };
 
 /* OpenLDAP::Result struct */
 struct ropenldap_result {
-	LDAP        *ldap;
-	int         msgid;
-	LDAPMessage *message;
-	VALUE       connection;
-	VALUE       abandoned;
+	int   msgid;
+	VALUE connection;
+	VALUE abandoned;
 };
+
+struct ropenldap_message {
+	LDAPMessage *msg;
+	VALUE       connection;
+};
+
 
 /* --------------------------------------------------------------
  * Macros
  * -------------------------------------------------------------- */
 #define IsConnection( obj ) rb_obj_is_kind_of( (obj), ropenldap_cOpenLDAPConnection )
 #define IsResult( obj ) rb_obj_is_kind_of( (obj), ropenldap_cOpenLDAPResult )
+#define IsMessage( obj ) rb_obj_is_kind_of( (obj), ropenldap_cOpenLDAPMessage )
 
 #ifdef UNUSED
 #elif defined(__GNUC__)
@@ -82,6 +90,11 @@ struct ropenldap_result {
 	} while (0)
 #define BER_BVISNULL(bv)	((bv)->bv_val == NULL)
 #define BER_BVISEMPTY(bv)	((bv)->bv_len == 0)
+
+// Convert decimal seconds to milliseconds
+#define MILLION_F 1000000.0
+
+
 
 
 /* --------------------------------------------------------------
@@ -112,8 +125,10 @@ VALUE ropenldap_rb_string_array         _(( char ** ));
 void Init_openldap_ext                  _(( void ));
 void ropenldap_init_connection          _(( void ));
 void ropenldap_init_result              _(( void ));
+void ropenldap_init_message             _(( void ));
 
-struct ropenldap_connection *ropenldap_get_conn _(( VALUE ));
+LDAP *ropenldap_conn_get_ldap           _(( VALUE ));
+VALUE ropenldap_new_message             _(( VALUE, LDAPMessage * ));
 
 
 #endif /* __OPENLDAP_H__ */

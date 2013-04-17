@@ -313,12 +313,14 @@ ropenldap_s_api_info( VALUE self )
 	LDAPAPIInfo info;
 	info.ldapai_info_version = LDAP_API_INFO_VERSION;
 
-	if ( ldap_get_option(NULL, LDAP_OPT_API_INFO, &info) != LDAP_SUCCESS )
+	if ( ldap_get_option(NULL, LDAP_OPT_API_INFO, &info) != LDAP_OPT_SUCCESS )
 		rb_raise( ropenldap_eOpenLDAPError, "ldap_get_option(API_INFO) failed." );
 
 	rb_hash_aset( rval, ID2SYM(rb_intern("api_version")), INT2FIX(info.ldapai_api_version) );
-	rb_hash_aset( rval, ID2SYM(rb_intern("protocol_version")), INT2FIX(info.ldapai_protocol_version) );
-	rb_hash_aset( rval, ID2SYM(rb_intern("extensions")), ropenldap_rb_string_array(info.ldapai_extensions) );
+	rb_hash_aset( rval, ID2SYM(rb_intern("protocol_version")),
+	              INT2FIX(info.ldapai_protocol_version) );
+	rb_hash_aset( rval, ID2SYM(rb_intern("extensions")),
+	              ropenldap_rb_string_array(info.ldapai_extensions) );
 	rb_hash_aset( rval, ID2SYM(rb_intern("vendor_name")), rb_str_new2(info.ldapai_vendor_name) );
 	rb_hash_aset( rval, ID2SYM(rb_intern("vendor_version")), INT2FIX(info.ldapai_vendor_version) );
 
@@ -346,7 +348,7 @@ ropenldap_s_api_feature_info( VALUE self )
 	LDAPAPIInfo info;
 	info.ldapai_info_version = LDAP_API_INFO_VERSION;
 
-	if ( ldap_get_option(NULL, LDAP_OPT_API_INFO, &info) != LDAP_SUCCESS )
+	if ( ldap_get_option(NULL, LDAP_OPT_API_INFO, &info) != LDAP_OPT_SUCCESS )
 		rb_raise( ropenldap_eOpenLDAPError, "ldap_get_option(API_INFO) failed." );
 
 	for( i=0; info.ldapai_extensions[i] != NULL; i++ ) {
@@ -355,7 +357,7 @@ ropenldap_s_api_feature_info( VALUE self )
 		fi.ldapaif_name = info.ldapai_extensions[i];
 		fi.ldapaif_version = 0;
 
-		if ( ldap_get_option(NULL, LDAP_OPT_API_FEATURE_INFO, &fi) == LDAP_SUCCESS ) {
+		if ( ldap_get_option(NULL, LDAP_OPT_API_FEATURE_INFO, &fi) == LDAP_OPT_SUCCESS ) {
 			if(fi.ldapaif_info_version == LDAP_FEATURE_INFO_VERSION) {
 				rb_hash_aset( rval, rb_str_new2(fi.ldapaif_name), INT2FIX(fi.ldapaif_version) );
 			} else {
@@ -392,7 +394,7 @@ ropenldap_s_uris( VALUE self )
 	VALUE rval;
 	char *uris;
 
-	if ( ldap_get_option(NULL, LDAP_OPT_URI, &uris) != LDAP_SUCCESS )
+	if ( ldap_get_option(NULL, LDAP_OPT_URI, &uris) != LDAP_OPT_SUCCESS )
 		rb_raise( ropenldap_eOpenLDAPError, "ldap_get_option(URI) failed." );
 
 	rval = rb_str_new2( uris );
@@ -402,10 +404,30 @@ ropenldap_s_uris( VALUE self )
 }
 
 
+static void
+ropenldap_check_api_version()
+{
+	LDAPAPIInfo info;
+	info.ldapai_info_version = LDAP_API_INFO_VERSION;
+
+	if ( ldap_get_option(NULL, LDAP_OPT_API_INFO, &info) != LDAP_OPT_SUCCESS )
+		rb_raise( ropenldap_eOpenLDAPError, "ldap_get_option(API_INFO) failed." );
+
+	if ( info.ldapai_api_version != LDAP_API_VERSION ) {
+		rb_warn( "Extension was compiled for API version %d,\nbut your library is version %d.",
+		         LDAP_API_VERSION, info.ldapai_api_version );
+	 }
+
+	ldap_memfree( info.ldapai_vendor_name );
+	ber_memvfree( (void **)info.ldapai_extensions );
+}
+
 
 void
 Init_openldap_ext( void )
 {
+	ropenldap_check_api_version();
+
 	rb_require( "uri" );
 	ropenldap_rbmURI = rb_const_get( rb_cObject, rb_intern("URI") );
 
@@ -543,7 +565,8 @@ Init_openldap_ext( void )
 	rb_define_singleton_method( ropenldap_mOpenLDAP, "split_url", ropenldap_s_split_url, 1 );
 	rb_define_singleton_method( ropenldap_mOpenLDAP, "err2string", ropenldap_s_err2string, 1 );
 	rb_define_singleton_method( ropenldap_mOpenLDAP, "api_info", ropenldap_s_api_info, 0 );
-	rb_define_singleton_method( ropenldap_mOpenLDAP, "api_feature_info", ropenldap_s_api_feature_info, 0 );
+	rb_define_singleton_method( ropenldap_mOpenLDAP, "api_feature_info",
+	                            ropenldap_s_api_feature_info, 0 );
 
 	rb_define_singleton_method( ropenldap_mOpenLDAP, "uris", ropenldap_s_uris, 0 );
 
