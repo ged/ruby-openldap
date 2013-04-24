@@ -433,6 +433,7 @@ ropenldap_conn_bind( int argc, VALUE *argv, VALUE self )
 	int res    = 0;
 	char *who  = NULL;
 	struct berval cred = BER_BVNULL;
+	struct berval *s_cred = NULL;
 	int msgid  = 0;
 
 	rb_scan_args( argc, argv, "02", &bind_dn, &password );
@@ -453,12 +454,13 @@ ropenldap_conn_bind( int argc, VALUE *argv, VALUE self )
 	// int ldap_sasl_bind(LDAP *ld, const char *dn, const char *mechanism,
 	//               struct berval *cred, LDAPControl *sctrls[],
 	//               LDAPControl *cctrls[], int *msgidp);
-	res = ldap_sasl_bind( ptr->ldap, who, LDAP_SASL_SIMPLE, &cred, NULL, NULL, &msgid );
+	res = ldap_sasl_bind_s( ptr->ldap, who, LDAP_SASL_SIMPLE, &cred, NULL, NULL, &s_cred );
 	if ( !BER_BVISNULL(&cred) ) {
 		ber_memfree( cred.bv_val );
 		BER_BVZERO( &cred );
 	}
-	ropenldap_log_obj( self, "debug", "Rval from ldap_sasl_bind_a: %d", res );
+
+	ropenldap_log_obj( self, "debug", "Rval from ldap_sasl_bind_s: %d", res );
 	ropenldap_check_result( res, "ldap_sasl_bind_s" );
 
 	return Qtrue;
@@ -1173,24 +1175,26 @@ static VALUE
 ropenldap_conn_search( int argc, VALUE *argv, VALUE self )
 {
 	struct ropenldap_connection *ptr = ropenldap_get_conn( self );
-	VALUE rb_base        = Qnil,
-	      rb_scope       = Qnil,
-	      rb_filter      = Qnil,
-	      rb_attrs       = Qnil,
-	      rb_attrsonly   = Qnil,
-	      rb_serverctrls = Qnil,
-	      rb_clientctrls = Qnil,
-	      rb_timeout     = Qnil,
-	      rb_sizelimit   = Qnil;
-	char *base = NULL;
-	int scope = LDAP_SCOPE_SUBTREE;
-	char *filter = NULL;
-	char *attrs[] = {};
-	int attrsonly = 0;
-	LDAPControl *serverctrls[] = {}, *clientctrls[] = {};
-	struct timeval timeout = { 0, 0 };
-	int sizelimit = -1;
-	rb_encoding *utf8 = rb_utf8_encoding();
+	VALUE rb_base             = Qnil,
+	      rb_scope            = Qnil,
+	      rb_filter           = Qnil,
+	      rb_attrs            = Qnil,
+	      rb_attrsonly        = Qnil,
+	      rb_serverctrls      = Qnil,
+	      rb_clientctrls      = Qnil,
+	      rb_timeout          = Qnil,
+	      rb_sizelimit        = Qnil;
+	char *base                = NULL;
+	int scope                 = LDAP_SCOPE_SUBTREE;
+	char *filter              = NULL;
+	char **attrs              = NULL;
+	int attrsonly             = 0;
+	LDAPControl **serverctrls = NULL,
+	            **clientctrls = NULL;
+	struct timeval *timeout   = NULL;
+	int sizelimit             = -1;
+	const VALUE utf8          = rb_enc_from_encoding(rb_utf8_encoding());
+	VALUE string_attrs        = Qnil;
 
 	// Result
 	int rval = -1;
@@ -1203,7 +1207,7 @@ ropenldap_conn_search( int argc, VALUE *argv, VALUE self )
 
 	// Base
 	SafeStringValue( rb_base );
-	rb_base = rb_str_encode( rb_filter, rb_enc_from_encoding(utf8), 0, Qnil );
+	rb_base = rb_str_encode( rb_base, utf8, 0, Qnil );
 	rb_gc_register_address( &rb_base );
 	base = StringValueCStr( rb_base );
 	ropenldap_log_obj( self, "debug", "  search base set to '%s'", base );
@@ -1215,17 +1219,45 @@ ropenldap_conn_search( int argc, VALUE *argv, VALUE self )
 	// Filter
 	if ( !NIL_P(rb_filter) ) {
 		SafeStringValue( rb_filter );
-		rb_filter = rb_str_encode( rb_filter, rb_enc_from_encoding(utf8), 0, Qnil );
+		rb_filter = rb_str_encode( rb_filter, utf8, 0, Qnil );
 		rb_gc_register_address( &rb_filter );
 		filter = StringValueCStr( rb_filter );
+		ropenldap_log_obj( self, "debug", "  filter set to %s", filter );
+	}
+
+	// Attrs
+	if ( !NIL_P(rb_attrs) ) {
+		string_attrs = rb_ary_new();
+		rb_gc_register_address( &string_attrs );
+		int i = 0;
+		VALUE obj = Qnil;
+
+		if ( TYPE(rb_attrs) != T_ARRAY ) {
+			rb_ary_push( string_attrs, rb_obj_as_string(rb_attrs) );
+		} else {
+			for ( i = 0; i < RARRAY_LEN(rb_attrs); i++ ) {
+				obj = rb_ary_entry( rb_attrs, i );
+				rb_ary_push( string_attrs, rb_str_encode(rb_obj_as_string(obj), utf8, 0, Qnil) );
+			}
+		}
+
+		attrs = ALLOCA_N( char *, RARRAY_LEN(string_attrs) + 1 );
+		for ( i = 0; i < RARRAY_LEN(string_attrs); i++ ) {
+			attrs[i] = RSTRING_PTR( RARRAY_PTR(string_attrs)[i] );
+			ropenldap_log_obj( self, "debug", "  added attr %s", attrs[i] );
+		}
+		attrs[i] = NULL;
 	}
 
 	// Do the search
+	ropenldap_log_obj( self, "debug", "  ldap_search_ext(%p, %s, %d, %s, %p, ...)",
+	                   ptr->ldap, base, scope, filter, attrs );
 	rval = ldap_search_ext( ptr->ldap, base, scope, filter, attrs, attrsonly,
-	                        serverctrls, clientctrls, &timeout, sizelimit,
+	                        serverctrls, clientctrls, timeout, sizelimit,
 	                        &msgid );
 
 	// Release all of the strings we were using
+	if ( !NIL_P(string_attrs) ) rb_gc_unregister_address( &string_attrs );
 	rb_gc_unregister_address( &rb_base );
 	rb_gc_unregister_address( &rb_filter );
 
@@ -1236,7 +1268,6 @@ ropenldap_conn_search( int argc, VALUE *argv, VALUE self )
 
 	return Qnil;
 }
-
 
 
 /*
@@ -1269,7 +1300,7 @@ ropenldap_init_connection( void )
 	rb_define_alias(  ropenldap_cOpenLDAPConnection, "fileno", "fdno" );
 	rb_define_method( ropenldap_cOpenLDAPConnection, "bind", ropenldap_conn_bind, -1 );
 
-	rb_define_method( ropenldap_cOpenLDAPConnection, "search", ropenldap_conn_search, 1 );
+	rb_define_method( ropenldap_cOpenLDAPConnection, "search", ropenldap_conn_search, -1 );
 	rb_define_alias ( ropenldap_cOpenLDAPConnection, "search_ext", "search" );
 
 	/* Options */

@@ -27,7 +27,7 @@ CLOBBER.include( TEST_WORKDIR.to_s )
 
 DLEXT        = RbConfig::CONFIG['DLEXT']
 EXT          = LIBDIR + "openldap_ext.#{DLEXT}"
-RUBY         = RbConfig.expand( "$(prefix)/$(ruby_install_name)" )
+RUBY         = RbConfig.expand( "$(bindir)/$(ruby_install_name)" )
 
 VALGRIND_OPTIONS = [
 	"--num-callers=50",
@@ -105,11 +105,12 @@ Rake::ExtensionTask.new( 'openldap_ext' )
 
 namespace :spec do
 
-	RSPEC_CMD = [ RUBY, '-S', 'rspec', '-Ilib:ext', SPECDIR.to_s ]
+	RSPEC_CMD = [ RUBY, '-S', 'rspec', SPECDIR.to_s ]
+	$stderr.puts "Rspec command: %p" % [ RSPEC_CMD ]
 
 	desc "Run the specs under GDB."
 	task :gdb => [ :compile ] do |task|
-		cmd = [ 'gdb' ] + GDB_OPTIONS
+		cmd = [ 'gdb', '-ex', 'run' ] + GDB_OPTIONS
 		cmd += [ '--args' ]
 		cmd += RSPEC_CMD
 		system( *cmd )

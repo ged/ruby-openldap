@@ -10,7 +10,7 @@ require 'openldap/connection'
 describe OpenLDAP::Connection do
 
 	before( :all ) do
-		setup_logging()
+		setup_logging( :debug )
 		@slapd_pid = start_testing_slapd()
 	end
 
@@ -206,8 +206,23 @@ describe OpenLDAP::Connection do
 			it "raises an appropriate exception on an invalid filter" do
 				expect {
 					@conn.search( TEST_BASE, :subtree, "(objectClass=*" );
-				}.to raise_error( OpenLDAP::FilterError, /invalid/i )
+				}.to raise_error( OpenLDAP::FilterError, /bad search filter/i )
 			end
+
+			it "can constrain return values to a subset of attributes when searching" do
+				result = @conn.search( TEST_BASE, :subtree, '(objectClass=*)', [:cn, :dc] )
+				result.count.should == 3
+			end
+
+			# it "handles a single attr argument when searching" do
+			# 	result = @conn.search( TEST_BASE, :subtree, '(objectClass=*)', 'cn' )
+			# 	result.count.should == 3
+			# end
+			# 
+			# it "stringifies the single attr argument when searching" do
+			# 	result = @conn.search( TEST_BASE, :subtree, '(objectClass=*)', :cn )
+			# 	result.count.should == 3
+			# end
 
 
 		end
