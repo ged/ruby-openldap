@@ -171,7 +171,7 @@ module OpenLDAP::SpecHelpers
 		cmd = [
 			slapd,
 			'-f', 'slapd.conf',
-			'-d', '64',
+			'-d', 'stats,args',
 			'-h', "ldap://localhost:6363 ldaps://localhost:6364"
 		]
 
@@ -200,7 +200,6 @@ module OpenLDAP::SpecHelpers
 
 		return found
 	end
-
 
 end
 
