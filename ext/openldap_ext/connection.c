@@ -434,7 +434,6 @@ ropenldap_conn_bind( int argc, VALUE *argv, VALUE self )
 	char *who  = NULL;
 	struct berval cred = BER_BVNULL;
 	struct berval *s_cred = NULL;
-	int msgid  = 0;
 
 	rb_scan_args( argc, argv, "02", &bind_dn, &password );
 
@@ -1195,6 +1194,7 @@ ropenldap_conn_search( int argc, VALUE *argv, VALUE self )
 	int sizelimit             = -1;
 	const VALUE utf8          = rb_enc_from_encoding(rb_utf8_encoding());
 	VALUE string_attrs        = Qnil;
+	VALUE result_args[2];
 
 	// Result
 	int rval = -1;
@@ -1266,7 +1266,10 @@ ropenldap_conn_search( int argc, VALUE *argv, VALUE self )
 
 	// Some other stuff
 
-	return Qnil;
+	result_args[0] = self;
+	result_args[1] = INT2FIX( msgid );
+
+	return rb_class_new_instance( 2, result_args, ropenldap_cOpenLDAPResult );
 }
 
 

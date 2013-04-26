@@ -572,6 +572,8 @@ Init_openldap_ext( void )
 
 	/* Initialize the other parts of the extension */
 	ropenldap_init_connection();
+	ropenldap_init_result();
+	ropenldap_init_message();
 
 	/* Detect mismatched linking */
 	ropenldap_check_link();

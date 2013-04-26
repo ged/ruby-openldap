@@ -22,7 +22,7 @@ describe OpenLDAP::Message do
 
 
 	it "can be created with a connection and a message ID" do
-		result = OpenLDAP::Result.new( )
+		result = OpenLDAP::Result.new
 	end
 
 end

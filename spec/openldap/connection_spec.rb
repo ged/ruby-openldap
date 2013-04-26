@@ -200,7 +200,7 @@ describe OpenLDAP::Connection do
 
 			it "returns all entries under the base without a filter" do
 				result = @conn.search( TEST_BASE )
-				result.count.should == 3
+				result.next.count.should == 3
 			end
 
 			it "raises an appropriate exception on an invalid filter" do
@@ -211,7 +211,7 @@ describe OpenLDAP::Connection do
 
 			it "can constrain return values to a subset of attributes when searching" do
 				result = @conn.search( TEST_BASE, :subtree, '(objectClass=*)', [:cn, :dc] )
-				result.count.should == 3
+				result.next.count.should == 3
 			end
 
 			# it "handles a single attr argument when searching" do
