@@ -132,6 +132,7 @@ class OpenLDAP::Connection
 	### Get the current CRL check strategy (a Symbol). See #tls_crlcheck=
 	### for a list of the valid return values and what they mean.
 	def tls_crlcheck
+		return :none if self.tls_package == 'GnuTLS'
 		sym = TLS_CRL_CHECK_STRATEGY_NAMES[ self._tls_crlcheck ] or
 			raise IndexError, "unknown TLS CRL evaluation strategy %p" % [self._tls_crlcheck]
 		return sym
@@ -139,7 +140,7 @@ class OpenLDAP::Connection
 
 
 	### Specify if the Certificate Revocation List (CRL) of the CA should be used to check
-	### if the client certificates have been revoked or not. This option is ignored with GNUtls.
+	### if the client certificates have been revoked or not. This option is ignored with GnuTLS.
 	### +strategy+ can be specified as one of the following:
 	###
 	### [:none]   No CRL checks are performed
@@ -150,7 +151,11 @@ class OpenLDAP::Connection
 	def tls_crlcheck=( strategy )
 		numeric_opt = TLS_CRL_CHECK_STRATEGIES[ strategy ] or
 			raise IndexError, "unknown TLS CRL evaluation strategy %p" % [strategy]
-		self._tls_crlcheck=( numeric_opt )
+		if self.tls_package == 'GnuTLS'
+			self.log.warn "CRL check strategies are ignored with GnuTLS"
+		else
+			self._tls_crlcheck=( numeric_opt )
+		end
 	end
 
 

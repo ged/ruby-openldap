@@ -3,6 +3,7 @@
 require 'pp'
 require 'rbconfig'
 require 'pathname'
+require 'rake/clean'
 
 begin
 	require 'rake/extensiontask'
@@ -59,16 +60,22 @@ Hoe.plugins.delete :compiler
 hoespec = Hoe.spec 'openldap' do
 	self.readme_file = 'README.md'
 	self.history_file = 'History.md'
+	self.extra_rdoc_files = FileList[ '*.md' ]
+	self.urls = {
+		home:   'http://deveiate.org/projects/ruby-openldap',
+		code:   'http://bitbucket.org/ged/ruby-openldap',
+		docs:   'http://deveiate.org/code/ruby-openldap',
+		github: 'http://github.com/ged/ruby-openldap',
+	}
 
 	self.developer 'Michael Granger', 'ged@FaerieMUD.org'
+
+	self.dependency 'loggability', '~> 0.12'
 
 	self.dependency 'rake-compiler', '~> 0.8', :developer
 	self.dependency 'hoe-deveiate',  '~> 0.2', :developer
 
-	self.spec_extras[:licenses] = ["BSD"]
-	# self.spec_extras[:extensions] = [ 'lib/openldap' ]
-
-	self.require_ruby_version( '>= 1.9.2' )
+	self.require_ruby_version( '>= 2.3.3' )
 
 	self.hg_sign_tags = true if self.respond_to?( :hg_sign_tags= )
 	self.rdoc_locations << "deveiate:/usr/local/www/public/code/#{remote_rdoc_dir}"
@@ -127,4 +134,6 @@ end
 
 # Rebuild the ChangeLog immediately before release
 task :prerelease => 'ChangeLog'
+
+CLEAN.include( 'test_workdir', 'tmp' )
 

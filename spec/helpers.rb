@@ -40,16 +40,34 @@ module OpenLDAP::SpecHelpers
 	SPEC_LDIF      = SPEC_DATADIR + 'testdata.ldif'
 
 
+	### Inclusion callback -- install hooks in the specified +context+.
+	def self::included( context )
+		context.before( :all ) do
+			OpenLDAP::SpecHelpers.trace( "Setting up testing slapd." )
+			@slapd_pid ||= OpenLDAP::SpecHelpers.start_testing_slapd()
+		end
+		context.after( :all ) do
+			if @slapd_pid
+				OpenLDAP::SpecHelpers.trace( "Halting testing slapd at PID %d." % [@slapd_pid] )
+				OpenLDAP::SpecHelpers.stop_testing_slapd( @slapd_pid )
+			end
+		end
+	end
+
+
+	###############
+	module_function
+	###############
+
 	### Output the specified +msg+ if VERBOSE.
 	def trace( *msg )
-		# return unless $VERBOSE
+		return unless $VERBOSE
 		$stderr.puts( *msg )
 	end
 
 
 	### Start a localized slapd daemon for testing.
 	def start_testing_slapd
-
 		unless TEST_DATADIR.exist?
 			self.create_test_directories
 			self.copy_test_files
@@ -186,12 +204,12 @@ module OpenLDAP::SpecHelpers
 	### Attempt to find the path to the binary with the specified +name+, returning it if found,
 	### or +nil+ if not.
 	def find_binary( name )
-		return ENV[name.upcase] if ENV.key?( name.upcase )
+		return ENV[ name.to_s.upcase ] if ENV.key?( name.to_s.upcase )
 
 		dirs = ENV['PATH'].split( File::PATH_SEPARATOR )
-		dirs += dirs \
-			.find_all {|dir| dir.end_with?('bin') } \
-			.map {|dir| dir[0..-4] + 'libexec' }
+		dirs += dirs.
+			find_all {|dir| dir.end_with?('bin') }.
+			map {|dir| dir[0..-4] + 'libexec' }
 
 		paths = dirs.collect {|dir| File.join(dir, name) }
 		found = paths.find {|path| File.executable?(path) } or
@@ -206,16 +224,18 @@ end
 
 ### Mock with Rspec
 RSpec.configure do |config|
-	include OpenLDAP::SpecHelpers
 	include OpenLDAP::TestConstants
-	include Loggability::SpecHelpers
 
-	config.mock_with :rspec
+	config.run_all_when_everything_filtered = true
+	config.filter_run :focus
+	config.order = 'random'
+
+	config.mock_with( :rspec ) do |mock|
+		mock.syntax = :expect
+	end
+
 	config.include( OpenLDAP::SpecHelpers )
-
-	config.filter_run_excluding( :ruby_1_9_only => true ) if RUBY_VERSION >= '1.9.0'
-	config.filter_run_excluding( :ruby_2_0_only => true ) if RUBY_VERSION >= '2.0.0'
-  # config.filter_run_excluding( :with_ldap_server => true ) unless TEST_CONFIG_FILE.exist?
+	config.include( Loggability::SpecHelpers )
 end
 
 # vim: set nosta noet ts=4 sw=4:

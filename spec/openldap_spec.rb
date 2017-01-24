@@ -7,15 +7,6 @@ require 'openldap'
 
 describe OpenLDAP do
 
-	before( :all ) do
-		setup_logging( :fatal )
-	end
-
-	after( :all ) do
-		reset_logging()
-	end
-
-
     # typedef struct ldap_url_desc {
     #     char *      lud_scheme;     /* URI scheme */
     #     char *      lud_host;       /* LDAP host to contact */
@@ -29,7 +20,7 @@ describe OpenLDAP do
     #     /* may contain additional fields for internal use */
     # } LDAPURLDesc;
 	it "can split an LDAP URL into its components" do
-		OpenLDAP.split_url( 'ldap://ldap.acme.com/dc=acme,dc=com' ).should == [
+		expect( OpenLDAP.split_url('ldap://ldap.acme.com/dc=acme,dc=com') ).to eq([
 			'ldap',
 			'ldap.acme.com',
 			389,
@@ -39,7 +30,7 @@ describe OpenLDAP do
 			nil,
 			[],
 			false,
-		]
+		])
 	end
 
 	it "raises an argument error when asked to split a String that isn't an LDAP URL" do
@@ -54,21 +45,21 @@ describe OpenLDAP do
 
 		result = OpenLDAP.split_url( url )
 
-		result[0].should be_tainted()
-		result[1].should be_tainted()
+		expect( result[0] ).to be_tainted()
+		expect( result[1] ).to be_tainted()
 		# port is an immediate object, so it's not tainted
-		result[3].should be_tainted()
+		expect( result[3] ).to be_tainted()
 	end
 
 	it "has a method for examining the API info of the library it's linked against" do
-		OpenLDAP.api_info.should be_a( Hash )
-		OpenLDAP.api_info.should include( :api_version, :protocol_version, :extensions,
+		expect( OpenLDAP.api_info ).to be_a( Hash )
+		expect( OpenLDAP.api_info ).to include( :api_version, :protocol_version, :extensions,
 		                                  :vendor_name, :vendor_version )
 	end
 
 	it "has a hash of extension versions for the library it's linked against" do
-		OpenLDAP.api_feature_info.should be_a( Hash )
-		OpenLDAP.api_feature_info.should include( *OpenLDAP.api_info[:extensions] )
+		expect( OpenLDAP.api_feature_info ).to be_a( Hash )
+		expect( OpenLDAP.api_feature_info ).to include( *OpenLDAP.api_info[:extensions] )
 	end
 
 end

@@ -65,6 +65,13 @@ VALUE
 ropenldap_new_message( VALUE conn, LDAPMessage *msg )
 {
 	struct ropenldap_message *ptr = ALLOC( struct ropenldap_message );
+	LDAP *ldap = ropenldap_conn_get_ldap( conn );
+	LDAPMessage *msg_iter = ldap_first_message( ldap, msg );
+
+	while ( msg_iter != NULL ) {
+		ropenldap_log( "debug", "Message ptr of type %x: %p", ldap_msgtype(msg_iter), msg_iter );
+		msg_iter = ldap_next_message( ldap, msg_iter );
+	}
 
 	ptr->connection = conn;
 	ptr->msg        = msg;

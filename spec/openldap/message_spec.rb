@@ -5,24 +5,16 @@ require_relative '../helpers'
 require 'rspec'
 require 'openldap/message'
 
-describe OpenLDAP::Message do
-
-	before( :all ) do
-		setup_logging( :fatal )
-	end
+describe OpenLDAP::Message, :slapd do
 
 	before( :each ) do
 		@ldap = OpenLDAP.connect( 'ldap://localhost' )
 		# @result = @ldap.search_ext( )
 	end
 
-	after( :all ) do
-		reset_logging()
-	end
 
-
-	it "can be created with a connection and a message ID" do
-		result = OpenLDAP::Result.new
+	xit "can be created with a connection and a message ID" do
+		result = OpenLDAP::Result.new( @ldap, @msgid )
 	end
 
 end

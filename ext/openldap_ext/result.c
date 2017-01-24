@@ -61,7 +61,7 @@ ropenldap_result_alloc( VALUE connection, int msgid )
 {
 	struct ropenldap_result *ptr = ALLOC( struct ropenldap_result );
 
-	ptr->msgid      = FIX2INT( msgid );
+	ptr->msgid      = msgid;
 	ptr->connection = connection;
 	ptr->abandoned  = Qfalse;
 
@@ -179,7 +179,7 @@ ropenldap_result_initialize( VALUE self, VALUE connection, VALUE msgid )
 
 /*
  * call-seq:
- *    abandon   -> true
+ *    result.abandon   -> true
  *
  * Abandon the operation in progress and discard any results that have been
  * queued.
@@ -203,35 +203,44 @@ ropenldap_result_abandon( int argc, VALUE *argv, VALUE self )
 
 /*
  * call-seq:
- *    next              -> message or nil
- *    next( timeout )   -> message or nil
+ *    result.fetch              -> message or nil
+ *    result.fetch( timeout )   -> message or nil
  *
- * Fetch the next result if it's ready.
+ * Fetch the next result if it's ready. Raises a TimeoutError if the fetch
+ * times out.
  *
  */
 static VALUE
-ropenldap_result_next( int argc, VALUE *argv, VALUE self )
+ropenldap_result_fetch( int argc, VALUE *argv, VALUE self )
 {
 	struct ropenldap_result *ptr = ropenldap_get_result( self );
 	LDAP *ldap = ropenldap_conn_get_ldap( ptr->connection );
 	VALUE timeout = Qnil;
 	VALUE message = Qnil;
 	LDAPMessage *msg = NULL;
-	struct timeval c_timeout = { 0, 0 };
+	struct timeval *c_timeout = NULL;
 	int res = 0;
 
 	rb_scan_args( argc, argv, "01", &timeout );
 
 	if ( !NIL_P(timeout) ) {
+		c_timeout = ALLOCA_N( struct timeval, 1 );
 		double seconds = NUM2DBL( timeout );
-		c_timeout.tv_sec = (time_t)floor( seconds );
-		c_timeout.tv_usec = (suseconds_t)( fmod(seconds, 1.0) * MILLION_F );
+		c_timeout->tv_sec = (time_t)floor( seconds );
+		c_timeout->tv_usec = (suseconds_t)( fmod(seconds, 1.0) * MILLION_F );
 	}
 
 	// int ldap_result( LDAP *ld, int msgid, int all,
 	//             struct timeval *timeout, LDAPMessage **result );
-	res = ldap_result( ldap, ptr->msgid, 0, &c_timeout, &msg );
-	ropenldap_check_result( res, "ldap_result" );
+	res = ldap_result( ldap, ptr->msgid, 0, c_timeout, &msg );
+
+	if ( res == 0 ) {
+		rb_raise( rb_eRuntimeError, "timeout!" );
+	}
+
+	else if ( res < 0 ) {
+		ropenldap_check_result( res, "ldap_result(%p, %d, ...)", ldap, ptr->msgid );
+	}
 
 	message = ropenldap_new_message( ptr->connection, msg );
 
@@ -262,7 +271,7 @@ ropenldap_init_result( void )
 	                            ropenldap_result_initialize, 2 );
 
 	rb_define_method( ropenldap_cOpenLDAPResult, "abandon", ropenldap_result_abandon, -1 );
-	rb_define_method( ropenldap_cOpenLDAPResult, "next", ropenldap_result_next, -1 );
+	rb_define_method( ropenldap_cOpenLDAPResult, "fetch", ropenldap_result_fetch, -1 );
 
 	rb_require( "openldap/result" );
 }
